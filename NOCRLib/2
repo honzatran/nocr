@@ -1,0 +1,20 @@
+#cmake_minimum_required(VERSION 2.8)
+#project ( desionTree )
+#find_package( OpenCV REQUIRED )
+#find_package( Boost REQUIRED )
+#add_executable ( desionTree main_desTree.cpp ../headers/segment/component.cpp 
+#  ../headers/findLetter/findLetter.cpp
+#  ../headers/swt/swt.cpp ../headers/iooper.cpp ../headers/segment/segment.cpp 
+#  ../headers/preprocesing.cpp
+#  )
+
+
+find_package( Boost COMPONENTS program_options REQUIRED )
+
+add_executable( TrainSVM main_desTree.cpp )
+target_link_libraries( TrainSVM ${OpenCV_LIBS} )
+target_link_libraries( TrainSVM NOCRLib )  
+target_link_libraries( TrainSVM ${NOCR_EXTERNAL_LIB}/libLibSVM.a ) 
+target_link_libraries( TrainSVM ${NOCR_EXTERNAL_LIB}/libLibLinear.a ) 
+
+target_link_libraries( TrainSVM ${Boost_PROGRAM_OPTIONS_LIBRARY} )
