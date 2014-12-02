@@ -16,9 +16,9 @@ using namespace std;
 
 int LevensteinDistance::operator() ( const string &a, const string &b )
 {
-    int distances[a.size()+1][b.size()+1];
-    int rows = a.size() + 1;
-    int cols = b.size() + 1; 
+    const int rows = a.size() + 1;
+    const int cols = b.size() + 1; 
+	auto distances = std::vector<std::vector<int>>(rows, std::vector<int>(cols));
     
     for ( int i = 0; i < rows; ++i )
     {

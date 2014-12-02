@@ -13,6 +13,7 @@
 #include <vector>
 #include <string>
 #include "dictionary.h"
+#include <algorithm>
 
 /**
  * @brief algorithm computing levenstein distance between 
