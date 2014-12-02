@@ -1,0 +1,4 @@
+nocr
+====
+
+bakalarka
