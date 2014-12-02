@@ -18,7 +18,8 @@ int LevensteinDistance::operator() ( const string &a, const string &b )
 {
     const int rows = a.size() + 1;
     const int cols = b.size() + 1; 
-	auto distances = std::vector<std::vector<int>>(rows, std::vector<int>(cols));
+
+    auto distances = std::vector<std::vector<int>>(rows, std::vector<int>(cols));
     
     for ( int i = 0; i < rows; ++i )
     {

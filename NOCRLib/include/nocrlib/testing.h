@@ -7,8 +7,15 @@
  * @date 2014-10-11
  */
 
+
 #ifndef NOCRLIB_TESTING_H
 #define NOCRLIB_TESTING_H
+
+#ifndef _MSC_VER
+#define NOEXCEPT noexcept
+#else
+#define NOEXCEPT
+#endif
 
 #include <memory>
 #include <vector>
@@ -129,7 +136,7 @@ class TestingException : public std::exception
 
         }
 
-        virtual const char* what() const noexcept override
+        virtual const char* what() const NOEXCEPT override
         {
             std::string final_msg = "TestingException: for" + 
                 image_name_ + " ground truth not found";

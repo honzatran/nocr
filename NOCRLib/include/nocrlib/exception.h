@@ -13,6 +13,12 @@
 #ifndef NOCRLIB_EXCEPTION_H
 #define NOCRLIB_EXCEPTION_H
 
+#ifndef _MSC_VER
+#define NOEXCEPT noexcept
+#else 
+#define NOEXCEPT
+#endif
+
 
 /**
  * @brief exception is thrown when unimplemented or 
@@ -28,7 +34,7 @@ class UnsupportedOperation : public std::exception
 
         }
 
-        virtual const char* what() const noexcept override
+        virtual const char* what() const NOEXCEPT override
         {
             std::string final_msg = "UnsupportedOperation: " + msg_;
             return final_msg.c_str();
@@ -49,7 +55,7 @@ class FileNotFoundException : public std::exception
 
         }
 
-        virtual const char* what() const noexcept override
+        virtual const char* what() const NOEXCEPT override
         {
             std::string final_msg = "FileNotFoundException: " + msg_;
             return final_msg.c_str();
@@ -77,7 +83,7 @@ class BadFileFormatting : public std::exception
             msg_.append(msg);
         }
 
-        virtual const char* what() const noexcept override
+        virtual const char* what() const NOEXCEPT override
         {
             std::string final_msg = "BadFileFormatting:" + msg_;
             return final_msg.c_str();
@@ -99,7 +105,7 @@ class ActionError: public std::exception
 
         }
 
-        virtual const char* what() const noexcept override
+        virtual const char* what() const NOEXCEPT override
         {
             std::string final_msg =  action_ + "cannot be done: "; 
             return final_msg.c_str();
