@@ -15,6 +15,7 @@
 
 #include <stack>
 #include <opencv2/core/core.hpp>
+#include <queue>
 
 /**
  * @brief policy for algorithm to build the component tree
@@ -80,54 +81,51 @@ class ComponentTreeBuilder
         // void buildTree()
         {
             //assert( image je v GrayScale)
-            //
-
             // step 1 - 2 of algorithm
             // initialization
             cv::Mat domain_bitmap = extraction_->getDomain();
             int init_pixel;
-            ComponentTreePolicy<E>::init( domain_bitmap, accessiblePixels_, stack_, &init_pixel );
+            ComponentTreePolicy<E>::init( domain_bitmap, accessible_pixels_, stack_, &init_pixel );
             const uchar* image_data = domain_bitmap.data;
             cols_ = domain_bitmap.cols; 
             rows_ = domain_bitmap.rows;
-            currPixel_ = PixelRecord(init_pixel,0); 
-            currLevel_ = image_data[init_pixel];
+            curr_pixel_ = { init_pixel,0 };
+            curr_level_ = image_data[init_pixel];
 
             for(;;)
             {
-                pushRegion( currLevel_, currPixel_.getCodePosition() ); // step 3 
-
+                pushRegion( curr_level_, curr_pixel_.code_position ); // step 3 
                 // step 4
                 for (;; )
                 {
                     bool goToStep3Required = false;
 
-                    for ( int i = currPixel_.getEdgeToDiscover(); i < 4 ; ++i )
+                    for ( int i = curr_pixel_.edge_to_discover; i < 4 ; ++i )
                     {
-                        int ncode = getNeighbour( currPixel_ );
-                        if ( accessiblePixels_[ncode] )
+                        int ncode = getNeighbour( curr_pixel_ );
+                        if ( accessible_pixels_[ncode] )
                         {
-                            currPixel_.setEdgeToDiscover( i + 1 );
+                            ++curr_pixel_.edge_to_discover;
                             continue; 
                             // was reached continue
                         }
 
-                        accessiblePixels_[ncode] = true;
+                        accessible_pixels_[ncode] = true;
                         int nlevel = image_data[ncode];
 
-                        PixelRecord pixInfo(ncode, 0); 
-                        currPixel_.setEdgeToDiscover( i + 1); 
-                        if ( nlevel >= currLevel_ )
+                        PixelRecord pixInfo = { ncode, 0 }; 
+                        ++curr_pixel_.edge_to_discover;
+                        if ( nlevel >= curr_level_ )
                         {
-                            boundaryPixels_.push( pixInfo,nlevel );
+                            boundary_pixels_.push( pixInfo, nlevel );
                         }
                         else 
                         {
                             // go down in stream
                             goToStep3Required = true;
-                            boundaryPixels_.push( currPixel_, currLevel_ );
-                            currPixel_ = pixInfo;
-                            currLevel_ = nlevel; 
+                            boundary_pixels_.push( curr_pixel_, curr_level_ );
+                            curr_pixel_ = pixInfo;
+                            curr_level_ = nlevel; 
                             break;
                         }
                     }
@@ -139,25 +137,24 @@ class ComponentTreeBuilder
                     }
 
                     // add current pixel to component on stack
-                    extraction_->accumulate( stack_.top(), currPixel_.getCodePosition() );
-                    if ( boundaryPixels_.empty() )
+                    extraction_->accumulate( stack_.top(), curr_pixel_.code_position);
+                    if ( boundary_pixels_.empty() )
                     {
                         // we are done
                         NodeType* root = stack_.top();
                         stack_.pop();
                         ComponentTreePolicy<E>::setRoot(root, extraction_);
-
                         return root;
                     }
 
                     // pop pixel from heap and then get new top of the heap
                     setNewCurrent();   
-                    int newCurrLevel = image_data[currPixel_.getCodePosition()];
+                    int newCurrLevel = image_data[curr_pixel_.code_position];
 
-                    if ( newCurrLevel > currLevel_ )
+                    if ( newCurrLevel > curr_level_ )
                     {
                         // go up filling the basin
-                        currLevel_ = newCurrLevel;
+                        curr_level_ = newCurrLevel;
                         processStackRoutine();
                     }
                 }
@@ -166,45 +163,10 @@ class ComponentTreeBuilder
 
     private:
         // private class declaration ===============================
-        class PixelRecord 
+        struct PixelRecord 
         {
-            public:
-                PixelRecord()
-                    :codePosition_(0), edgeToDiscover_(0)
-                {
-                    
-                }
-
-                PixelRecord( const int &codePosition, const int &edgeToDiscover = 0 )
-                    : codePosition_( codePosition ), edgeToDiscover_(edgeToDiscover)
-                {
-                }
-                
-
-                int getCodePosition() const 
-                {
-                    return codePosition_;
-                }
-
-                int getEdgeToDiscover() const 
-                {
-                    return edgeToDiscover_;
-                }
-
-                void setEdgeToDiscover(const int newEdgeToDiscover)
-                {
-                    edgeToDiscover_ = newEdgeToDiscover;
-                }
-
-                bool isExplored() const  
-                {
-                    return edgeToDiscover_ > 7;
-                }
-
-
-            private:
-                int codePosition_;
-                int edgeToDiscover_;
+            int code_position;
+            int edge_to_discover;
         };
 
 
@@ -270,7 +232,6 @@ class ComponentTreeBuilder
                     }
                 }
 
-            private:
                 // int priority_;
                 std::vector< std::vector< T > > heap_;
                 std::priority_queue<int> priority_heap_;
@@ -294,18 +255,18 @@ class ComponentTreeBuilder
 
         typedef typename ComponentTreePolicy<E>::NodeType NodeType;
 
-        std::vector<bool> accessiblePixels_;
-        BitmapHeap<PixelRecord> boundaryPixels_; 
-        int currLevel_;
-        PixelRecord currPixel_;
+        std::vector<bool> accessible_pixels_;
+        BitmapHeap<PixelRecord> boundary_pixels_; 
+        int curr_level_;
+        PixelRecord curr_pixel_;
         std::stack< NodeType* > stack_;
 
         int rows_, cols_;
 
         int getNeighbour( const PixelRecord &rec )
         {
-            int pos = rec.getCodePosition();
-            switch( rec.getEdgeToDiscover() )
+            int pos = rec.code_position;
+            switch( rec.edge_to_discover )
             {
                 case 0: return pos - cols_; 
                 case 1: return pos - 1; 
@@ -316,8 +277,8 @@ class ComponentTreeBuilder
 
         void setNewCurrent()
         {
-            currPixel_ = boundaryPixels_.top();
-            boundaryPixels_.pop();
+            curr_pixel_ = boundary_pixels_.top();
+            boundary_pixels_.pop();
         }
 
         void pushRegion( int level, int pixel_code )
@@ -340,22 +301,19 @@ class ComponentTreeBuilder
                 NodeType *child = stack_.top(); 
                 stack_.pop();
                 top_level = ComponentTreePolicy<E>::getLevel( stack_.top() ); 
-                if ( currLevel_ < top_level ) 
+                if ( curr_level_ < top_level ) 
                 {
-                    pushRegion( currLevel_, currPixel_.getCodePosition() );
+                    pushRegion( curr_level_, curr_pixel_.code_position );
                     extraction_->merge( child, stack_.top() ); 
                     return;
                 }
 
                 extraction_->merge( child, stack_.top() ); 
             }
-            while( currLevel_ > top_level ); 
+            while( curr_level_ > top_level ); 
         }
 
 };
-
-
-
 
 #endif /* component_tree_builder.h */
 

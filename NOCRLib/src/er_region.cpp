@@ -5,8 +5,11 @@
  * Compiler: g++ 4.8.3
  */
 #include "../include/nocrlib/er_region.h"
+#include "../include/nocrlib/features.h"
 
 #include <vector>
+#include <bitset>
+#include <cassert>
 
 #include <opencv2/core/core.hpp>
 
@@ -15,6 +18,7 @@ using namespace std;
 using namespace cv;
 
 const float ERRegion::EulerQuadRecord::c = 1/sqrt(2);
+const double ERRegion::EulerQuadRecordBit::k_c = 1/sqrt(2);
 const int ERRegion::EulerQuadRecord::start_zero[] = { 0,1,3,4 };
 const int ERRegion::EulerQuadRecord::start_one[] = { 1,2,4,5 };
 const int ERRegion::EulerQuadRecord::start_three[] = { 3,4,6,7 };
@@ -85,6 +89,116 @@ void ERRegion::EulerQuadRecord::changeAtQuad(const int *indices, int elemToChang
             break;
     }
 }
+
+void ERRegion::EulerQuadRecordBit::update(std::uint16_t quads)
+{
+    std::bitset<4> quad = quads & 0xF;
+    switch(quad.count())
+    {
+        case 0:
+            ++q1_count;
+            break;
+        case 1:
+            --q1_count;
+            if (quad != 1)
+                ++q2_count;
+            else
+                ++q2d_count;
+            break;
+        case 2:
+            if(quad != 6)
+                --q2_count;
+            else
+                --q2d_count;
+
+            ++q3_count;
+            break;
+        default:
+            --q3_count;
+            break;
+    }
+
+    quad = (quads & 0xF0) >> 4;
+
+    switch(quad.count())
+    {
+        case 0:
+            ++q1_count;
+            break;
+        case 1:
+            --q1_count;
+            if (quad != 2)
+                ++q2_count;
+            else
+                ++q2d_count;
+            break;
+        case 2:
+            if(quad != 9)
+                --q2_count;
+            else
+                --q2d_count;
+
+            ++q3_count;
+            break;
+        default:
+            --q3_count;
+            break;
+    }
+
+    quad = (quads & 0xF00) >> 8;
+
+    switch(quad.count())
+    {
+        case 0:
+            ++q1_count;
+            break;
+        case 1:
+            --q1_count;
+            if (quad != 4)
+                ++q2_count;
+            else
+                ++q2d_count;
+            break;
+        case 2:
+            if(quad != 9)
+                --q2_count;
+            else
+                --q2d_count;
+
+            ++q3_count;
+            break;
+        default:
+            --q3_count;
+            break;
+    }
+
+    quad = (quads  & 0xF000) >> 12;
+    switch(quad.count())
+    {
+        case 0:
+            ++q1_count;
+            break;
+        case 1:
+            --q1_count;
+            if (quad != 8)
+                ++q2_count;
+            else
+                ++q2d_count;
+            break;
+        case 2:
+            if(quad != 6)
+                --q2_count;
+            else
+                --q2d_count;
+
+            ++q3_count;
+            break;
+        default:
+            --q3_count;
+            break;
+    }
+}
+
 
 
 
@@ -233,7 +347,8 @@ ERRegion::~ERRegion()
 
 
 
-void ERRegion::addPoint( LinkedPoint *point, int horizontalCrossingChange, bool *quad )
+// void ERRegion::addPoint( LinkedPoint *point, int horizontalCrossingChange, bool *quad )
+void ERRegion::addPoint( LinkedPoint *point, int horizontalCrossingChange)
 {
     if ( size_ > 0 ) 
     {
@@ -252,7 +367,7 @@ void ERRegion::addPoint( LinkedPoint *point, int horizontalCrossingChange, bool 
     
     tail_ = point;
     ++size_;
-    rec_.update( quad ); 
+    // rec_.update( quad ); 
     horizontal_crossings_.updateHorizontalCrossing( point->val_.y, horizontalCrossingChange );
     // perim_.updateChange( quad );
     updateSize( point->val_ );
@@ -302,6 +417,11 @@ void ERRegion::updateMeans( const cv::Vec4b &new_value )
     sums_ += new_value;
 }
 
+void ERRegion::updateEulerBit(std::uint16_t quads)
+{
+    bit_rec_.update(quads);
+}
+
 void ERRegion::merge( ERRegion &child )
 {
     if ( child.size_ > 0 && size_ > 0 )
@@ -337,7 +457,8 @@ void ERRegion::merge( ERRegion &child )
     y_min_ = std::min( y_min_, child.y_min_ );
 
     size_ += child.size_;
-    rec_.merge( child.rec_ );
+    // rec_.merge( child.rec_ );
+    bit_rec_.merge( child.bit_rec_);
     // perim_.merge( child.perim_ );
 
     sums_ += child.sums_;
@@ -351,13 +472,10 @@ void ERRegion::setMedianCrossing()
 vector<float> ERRegion::getFeatures() const
 {
     float aspect_ratio = (float) getWidth()/getHeight();
-    float compactness = (float) (std::sqrt( size_ ))/rec_.getPerimeterLength();
-    // float compactness = (float) std::sqrt( size_ )/perim_.val_;
+    float compactness = (float) (std::sqrt( size_ ))/bit_rec_.getPerimeterLength();
 
-    // cout <<  compactness << " " << tmp << endl;
-    //
     return { aspect_ratio, compactness, 
-        (float)1 - rec_.getEulerNumber(), (float)med_crossing };
+        (float)1 - bit_rec_.getEulerNumber(), (float)med_crossing };
 }
 
 Component ERRegion::toComponent() const

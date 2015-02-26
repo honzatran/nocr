@@ -13,28 +13,29 @@ set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${NOCR_SOURCE_DIR}/lib" )
 set( NOCR_EXTERNAL_LIB ${NOCR_SOURCE_DIR}/lib )
 
 # include_directories( ${VLROOT_INCLUDE_DIR} )
-include_directories( ${NOCR_SOURCE_DIR}/libsvm-3.18/ )
-include_directories( ${NOCR_SOURCE_DIR}/liblinear-1.94/ )
-include_directories( ${NOCR_SOURCE_DIR}/pugixml/ )
+include_directories( ${NOCR_SOURCE_DIR}/External-libraries/libsvm-3.18/ )
+include_directories( ${NOCR_SOURCE_DIR}/External-libraries/liblinear-1.94/ )
+include_directories( ${NOCR_SOURCE_DIR}/External-libraries/pugixml/ )
     
-add_compile_options(-std=c++0x -Wall -ggdb)
+if (UNIX)
+    add_compile_options(-std=c++0x -Wall -ggdb -Wextra)
+endif(UNIX)
 
-add_subdirectory( libsvm-3.18 )
-add_subdirectory( liblinear-1.94 )
-add_subdirectory( pugixml )
+add_subdirectory( ./External-libraries)
+
+set (required_libraries 
+        ${NOCR_EXTERNAL_LIB}/libpugi.so
+        ${NOCR_EXTERNAL_LIB}/libLibSVM.so 
+        ${NOCR_EXTERNAL_LIB}/libLibLinear.so)
+
 add_subdirectory( NOCRLib )
 
 include_directories( "${NOCR_SOURCE_DIR}/NOCRLib/include" )
 
-add_subdirectory( NOCRMain )
-add_subdirectory( GtExtractor )
-# add_subdirectory( NOCRTrainDataGenerator )
-# add_subdirectory( NOCRTrainSVM)
-# add_subdirectory( NOCRTrainBoosting )
-# add_subdirectory( NOCRGui )
-# add_subdirectory( NOCRExperiment )
-# add_subdirectory( LetterDetection )
-# add_subdirectory( ErExtractor )
+add_subdirectory( ./NOCRMain )
+add_subdirectory( ./Experiments-programs)
+add_subdirectory( ./Training-programs)
+add_subdirectory( ./PerformanceMeasuring-programs)
 
 
 

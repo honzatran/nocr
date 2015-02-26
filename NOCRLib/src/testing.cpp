@@ -165,7 +165,7 @@ void Testing::loadGroundTruth( GroundTruthInterface *gt_ptr )
     gt_ptr->storeGroundTruth(ground_truth_);
 }
 
-void Testing::setTruePositiveDecider( const DeciderPtr &decider_ptr )
+void Testing::setTruePositiveDecider( TruePositiveInterface * decider_ptr)
 {
     decider_ptr_ = decider_ptr;
 }
@@ -197,7 +197,7 @@ void Testing::updateScores(
         // update positive truth
         for ( const auto &word: words )
         {
-            if ( ground_truth.containWord(word, decider_ptr_.get()) )
+            if ( ground_truth.containWord(word, decider_ptr_) )
             {
                 true_positives_++;
             }

@@ -176,7 +176,7 @@ class Testing
          * @return 
          */
         void setTruePositiveDecider
-            ( const std::shared_ptr<TruePositiveInterface> &decider_ptr );
+            ( TruePositiveInterface * decider_ptr);
 
         void resetCounters();
 
@@ -215,8 +215,7 @@ class Testing
     private:
         std::map<std::string, ImageGroundTruth> ground_truth_;
 
-        typedef std::shared_ptr<TruePositiveInterface> DeciderPtr;
-        DeciderPtr decider_ptr_;
+        TruePositiveInterface * decider_ptr_;
 
         unsigned int true_positives_;
         unsigned int number_results_;

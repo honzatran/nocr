@@ -30,7 +30,6 @@ set ( HEADERS
     ./include/nocrlib/ground_truth_impl.h
     )
   
-
 set ( SOURCES 
     ./src/component.cpp  
     ./src/iooper.cpp
@@ -61,7 +60,7 @@ set ( SOURCES
     ./src/ground_truth_impl.cpp
     )
     
-add_library( NOCRLib ${HEADERS} ${SOURCES} )
+add_library( NOCRLib SHARED ${HEADERS} ${SOURCES} )
 add_definitions( -DPRINT_INFO -DPRINT_TIME)
 
 

@@ -19,12 +19,13 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <algorithm>
 
 /**
  * @brief enum for component extraction in image 
  * to perform training on features extracted from components
  */
-enum class extraction { BlackAndWhite };
+enum class extraction { BlackAndWhite, BWMaxComponent };
 
 
 /**
@@ -56,6 +57,26 @@ class TrainExtractionPolicy<extraction::BlackAndWhite>
         }
 
 };
+
+template<>
+class TrainExtractionPolicy<extraction::BWMaxComponent>
+{
+    public:
+        static std::vector<Component> extract( 
+                const cv::Mat &image ) 
+        {
+            ComponentFinder<ComponentMergeRule, connectivity::eightpass> cf( image );
+            std::vector<Component> comp = cf.findAllComponents();
+            std::sort(comp.begin(), comp.end(), [] (const Component & a,const Component & b)
+                    {
+                        return a.size() <  b.size();
+                    });
+
+            return { comp.front() };
+        }
+            
+};
+
 /// @endcond
 
 /**
@@ -110,7 +131,7 @@ struct TrainDataCreator
             cv::Mat image = cv::imread( info.getPathToFile(), CV_LOAD_IMAGE_GRAYSCALE );
             if ( image.empty() )
             {
-                // std::cout << info.getPathToFile() << std::endl;
+                std::cout << info.getPathToFile() << std::endl;
                 // TODO
                 // throw exception
                 continue;

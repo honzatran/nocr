@@ -164,8 +164,8 @@ class ERFilter2Stage
          */
         void loadConfiguration( const std::string &conf )
         {
-            svm_.loadConfiguration( conf, "scaling_er2stage.conf");
-            // svm_.loadConfiguration( conf );
+            // svm_.loadConfiguration( conf, "scaling_er2stage.conf");
+            svm_.loadConfiguration( conf );
         }
 
 
@@ -180,8 +180,8 @@ class ERFilter2Stage
 
     private:
         std::unique_ptr< AbstractFeatureExtractor > features_extractor_;
-        // LibSVM<feature::ERGeom1> svm_;
-        ScalingLibSVM<feature::ERGeom1> svm_;
+        LibSVM<feature::ERGeom1> svm_;
+        // ScalingLibSVM<feature::ERGeom1> svm_;
 };
 
 // ==================================Extremal region=========================

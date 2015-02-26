@@ -110,42 +110,64 @@ void ERTree::accumulate( NodeType *reg, int code )
 
     int horiz_cross_change = 0;
     uchar pVal = image_data[code];
-    bool quad[9];
-    for ( int i = 0; i < 8; ++i )
-    {
-        int ncode = 0;
-        switch ( i )
-        {
-            case 0: ncode = code - 1 - cols_; break; 
-            case 1: ncode = code - cols_; break; 
-            case 2: ncode = code + 1 - cols_; break;
-            case 3: ncode = code - 1; break;
-            case 4: ncode = code + 1; break;
-            case 5: ncode = code - 1 + cols_; break; 
-            case 6: ncode = code + cols_; break; 
-            case 7: ncode = code + 1 + cols_; break;
-            default: break;
-        }
+    std::uint16_t mask = 0;
+    bool acc_neighbour;
+    // case 0: 
+        int ncode = code - 1 - cols_; 
+        mask |= ((accumulated_pixels_[ncode])
+                && (image_data[ncode] <= pVal));
+    // case 1: 
+        ncode = code - cols_; 
+        acc_neighbour = ((accumulated_pixels_[ncode])
+                && (image_data[ncode] <= pVal));
+        mask |= acc_neighbour << 1 | acc_neighbour << 4;
+    // case 2: 
+        ncode = code + 1 - cols_; 
+        acc_neighbour = ((accumulated_pixels_[ncode])
+                && (image_data[ncode] <= pVal));
+        mask |= acc_neighbour << 5;
+    // case 3: 
+        ncode = code - 1; 
+        acc_neighbour = ((accumulated_pixels_[ncode])
+                && (image_data[ncode] <= pVal));
+        mask |= acc_neighbour << 2 | acc_neighbour << 8;
 
-        int index;
-        index = i < 4 ?  i :  i+1; 
+        if (acc_neighbour)
+            horiz_cross_change++;
+    // case 4: 
+        ncode = code + 1; 
+        acc_neighbour = ((accumulated_pixels_[ncode])
+                && (image_data[ncode] <= pVal));
 
-        quad[index] = ((accumulated_pixels_[ncode])
-                        && (image_data[ncode] <= pVal));
+        mask |= acc_neighbour << 7 | acc_neighbour << 13;
 
-        if ( ( i == 3 || i == 4 ) && ( quad[index] ) )
-        {
-            ++horiz_cross_change;
-        }
-    }
+        if (acc_neighbour)
+            horiz_cross_change++;
+    // case 5: 
+        ncode = code - 1 + cols_; 
+        acc_neighbour = ((accumulated_pixels_[ncode])
+                && (image_data[ncode] <= pVal));
+        mask |= acc_neighbour << 10;
+    // case 6: 
+        ncode = code + cols_; 
+        acc_neighbour = ((accumulated_pixels_[ncode])
+                && (image_data[ncode] <= pVal));
+        mask |= acc_neighbour << 11 | acc_neighbour << 14;
+    // case 7: 
+        ncode = code + 1 + cols_; 
+        acc_neighbour = ((accumulated_pixels_[ncode])
+                && (image_data[ncode] <= pVal));
+        mask |= acc_neighbour << 15;
 
-    quad[4] = false; 
+    ERRegion * ptr = &reg->getVal();
 
-    reg->getVal().addPoint( &points_[processed_points_++], 
-                            horiz_cross_change ,quad );
+    // ptr->addPoint( &points_[processed_points_++], 
+    //                         horiz_cross_change , quad );
+    ptr->addPoint( &points_[processed_points_++], horiz_cross_change);
     // minus offset (1,1) because of add zero border
-    reg->getVal().updateMeans( 
+    ptr->updateMeans( 
             value_mat_.at<cv::Vec4b>( accumulated_point.y - 1, accumulated_point.x -1 ) );
+    ptr->updateEulerBit(mask);
     accumulated_pixels_[code] = true;
 }
 

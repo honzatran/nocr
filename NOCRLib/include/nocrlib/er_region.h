@@ -15,6 +15,8 @@
 
 #include <algorithm>
 #include <queue>
+#include <cstdint>
+#include <bitset>
 
 
 struct LinkedPoint 
@@ -104,7 +106,8 @@ class ERRegion
          * This method will update all neccessery information and adds the point 
          * to the region.
          */
-        void addPoint( LinkedPoint *point, int horizontalCrossingChange, bool *quads );
+        // void addPoint( LinkedPoint *point, int horizontalCrossingChange, bool *quads );
+        void addPoint( LinkedPoint *point, int horizontalCrossingChange);
 
         /**
          * @brief merge region to this region
@@ -268,6 +271,8 @@ class ERRegion
          */
         void updateMeans( const cv::Vec4b &new_values ); 
 
+        void updateEulerBit(std::uint16_t quads);
+
         /**
          * @brief create ERStat based on means
          *
@@ -316,6 +321,37 @@ class ERRegion
             }
 
             int q1Count_, q2Count_, q2DCount_, q3Count_;
+        };
+
+        struct EulerQuadRecordBit
+        {
+            EulerQuadRecordBit() 
+                : q1_count(0), q2_count(0), q2d_count(0), q3_count(0) 
+            { 
+            }
+
+            int q1_count, q2_count, q2d_count, q3_count;
+            const static double k_c;
+
+            void update(std::uint16_t quads);
+
+            int getEulerNumber() const 
+            {
+                return ( q1_count - q3_count + 2 * q2d_count )/4;
+            }
+
+            float getPerimeterLength() const 
+            {
+                return q2_count + k_c * ( q1_count + 2 * q2d_count + q3_count );
+            }
+
+            void merge( const EulerQuadRecordBit &a )
+            {
+                q1_count += a.q1_count;
+                q2_count += a.q2_count;
+                q2d_count += a.q2d_count;
+                q3_count += a.q3_count;
+            }
         };
 
         class HorizontalCrossingTracker
@@ -384,9 +420,9 @@ class ERRegion
 
         CompPtr c_ptr_;
 
-        EulerQuadRecord rec_;
+        // EulerQuadRecord rec_;
+        EulerQuadRecordBit bit_rec_;
         HorizontalCrossingTracker horizontal_crossings_;
-        PerimeterLengthTracker  perim_;
 
         int med_crossing;
         float probability_;

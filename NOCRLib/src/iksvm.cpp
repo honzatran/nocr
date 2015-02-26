@@ -286,7 +286,7 @@ std::vector<ApproximatedFunction> IKSVMConvertor::approximateDecisionFunction
         alpha.insert( alpha.end(), b_sv_coef.begin(), b_sv_coef.end() );
 
         VectorPair sorted_sequence = sortWithIndices( 
-                getColumn(i,a_support_vectors), 
+                getColumn(i, a_support_vectors), 
                 getColumn(i, b_support_vectors) );
 
         vector<double> samples = linspace( sorted_sequence[0].first, 
