@@ -35,6 +35,17 @@ class TextGroundTruth : public GroundTruthInterface
                 const std::string & line );
 };
 
+struct LetterSegmentGT
+{
+    cv::Rect rectangle;
+    cv::Vec3b color;
+    char letter;
+};
+
+
+
+
+
 
 
 #endif /* ground_truth_impl.h */

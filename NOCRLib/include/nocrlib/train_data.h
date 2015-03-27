@@ -67,12 +67,13 @@ class TrainExtractionPolicy<extraction::BWMaxComponent>
         {
             ComponentFinder<ComponentMergeRule, connectivity::eightpass> cf( image );
             std::vector<Component> comp = cf.findAllComponents();
-            std::sort(comp.begin(), comp.end(), [] (const Component & a,const Component & b)
+
+            auto comp_it = std::max_element(comp.begin(), comp.end(), [] (const Component & a, const Component & b) 
                     {
-                        return a.size() <  b.size();
+                        return a.size() < b.size();
                     });
 
-            return { comp.front() };
+            return { *comp_it };
         }
             
 };
@@ -147,7 +148,6 @@ struct TrainDataCreator
                 }
             }
         }
-
     }
 };
 

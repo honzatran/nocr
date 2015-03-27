@@ -125,7 +125,6 @@ class Loader
             }
             return output;
         }
-
 };
 
 
@@ -135,15 +134,13 @@ class Loader
 class OutputWriter
 {
     public:
-        // OutputWriter() = default;
+        OutputWriter() = default;
 
         OutputWriter( std::ostream *out, char delim = ':' ) 
             : out_(out), delim_(delim)
         { 
         }
         
-        ~OutputWriter() { }
-
         template<typename T> void write( const std::vector<T> &values, float label )
         {
             write( values );
@@ -155,7 +152,6 @@ class OutputWriter
             std::for_each( values.begin(), values.end() - 1,  
                     [this] (const T &val) { *out_ << val << delim_; });
             *out_ << values.back();
-
         }
         
         template <typename T> void writeln( const std::vector<T> &values )

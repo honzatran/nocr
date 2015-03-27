@@ -111,53 +111,57 @@ void ERTree::accumulate( NodeType *reg, int code )
     int horiz_cross_change = 0;
     uchar pVal = image_data[code];
     std::uint16_t mask = 0;
-    bool acc_neighbour;
     // case 0: 
-        int ncode = code - 1 - cols_; 
-        mask |= ((accumulated_pixels_[ncode])
-                && (image_data[ncode] <= pVal));
+        int ncode0 = code - 1 - cols_; 
+        bool acc_neighbour0 = ((accumulated_pixels_[ncode0])
+                && (image_data[ncode0] <= pVal));
     // case 1: 
-        ncode = code - cols_; 
-        acc_neighbour = ((accumulated_pixels_[ncode])
-                && (image_data[ncode] <= pVal));
-        mask |= acc_neighbour << 1 | acc_neighbour << 4;
+        int ncode1 = code - cols_; 
+        bool acc_neighbour1 = ((accumulated_pixels_[ncode1])
+                && (image_data[ncode1] <= pVal));
+
     // case 2: 
-        ncode = code + 1 - cols_; 
-        acc_neighbour = ((accumulated_pixels_[ncode])
-                && (image_data[ncode] <= pVal));
-        mask |= acc_neighbour << 5;
+        int ncode2 = code + 1 - cols_; 
+        bool acc_neighbour2 = ((accumulated_pixels_[ncode2])
+                && (image_data[ncode2] <= pVal));
+         
     // case 3: 
-        ncode = code - 1; 
-        acc_neighbour = ((accumulated_pixels_[ncode])
-                && (image_data[ncode] <= pVal));
-        mask |= acc_neighbour << 2 | acc_neighbour << 8;
+        int ncode3 = code - 1; 
+        bool acc_neighbour3 = ((accumulated_pixels_[ncode3])
+                && (image_data[ncode3] <= pVal));
 
-        if (acc_neighbour)
+        if (acc_neighbour3)
             horiz_cross_change++;
+
     // case 4: 
-        ncode = code + 1; 
-        acc_neighbour = ((accumulated_pixels_[ncode])
-                && (image_data[ncode] <= pVal));
+        int ncode4 = code + 1; 
+        bool acc_neighbour4 = ((accumulated_pixels_[ncode4])
+                && (image_data[ncode4] <= pVal));
 
-        mask |= acc_neighbour << 7 | acc_neighbour << 13;
-
-        if (acc_neighbour)
+        if (acc_neighbour4)
             horiz_cross_change++;
+
     // case 5: 
-        ncode = code - 1 + cols_; 
-        acc_neighbour = ((accumulated_pixels_[ncode])
-                && (image_data[ncode] <= pVal));
-        mask |= acc_neighbour << 10;
+        int ncode5 = code - 1 + cols_; 
+        bool acc_neighbour5 = ((accumulated_pixels_[ncode5])
+                && (image_data[ncode5] <= pVal));
     // case 6: 
-        ncode = code + cols_; 
-        acc_neighbour = ((accumulated_pixels_[ncode])
-                && (image_data[ncode] <= pVal));
-        mask |= acc_neighbour << 11 | acc_neighbour << 14;
+        int ncode6 = code + cols_; 
+        bool acc_neighbour6 = ((accumulated_pixels_[ncode6])
+                && (image_data[ncode6] <= pVal));
+
     // case 7: 
-        ncode = code + 1 + cols_; 
-        acc_neighbour = ((accumulated_pixels_[ncode])
-                && (image_data[ncode] <= pVal));
-        mask |= acc_neighbour << 15;
+        int ncode7 = code + 1 + cols_; 
+        bool acc_neighbour7 = ((accumulated_pixels_[ncode7])
+                && (image_data[ncode7] <= pVal));
+
+        std::uint16_t q1 = acc_neighbour0 | acc_neighbour1 << 1 | acc_neighbour3 << 2;
+        std::uint16_t q2 = acc_neighbour1 << 4| acc_neighbour2 << 5 | acc_neighbour4 << 7;
+        std::uint16_t q3 = acc_neighbour3 << 8 | acc_neighbour5 << 10 | acc_neighbour6 << 11;
+        std::uint16_t q4 = acc_neighbour4 << 13| acc_neighbour6 << 14 | acc_neighbour7 << 15;
+
+        mask = q1 | q2 | q3 | q4;
+
 
     ERRegion * ptr = &reg->getVal();
 
@@ -587,6 +591,16 @@ auto ERTextDetection::getLetters( const cv::Mat &image )
     letters_storages.insert( letters_storages.end(), tmp.begin(), tmp.end() );
     
     return letters_storages;
+}
+
+void ComponentExtractor::operator() (const ERRegion & er_region)
+{
+    extracted_components_.push_back(er_region.toComponent());
+}
+
+std::vector<Component> ComponentExtractor::getExtractedComponents() const 
+{
+    return extracted_components_;
 }
 
 

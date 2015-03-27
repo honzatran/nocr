@@ -27,8 +27,14 @@
 #include <iterator>
 #include <fstream>
 #include <type_traits>
+#include <chrono>
+#include <random>
+#include <functional>
 
 /// @cond
+//
+
+#define UNUSED(x) (void)(x);
 
 using namespace std;
 
@@ -288,7 +294,11 @@ template <typename Clock, typename Type > class timeCounter
 class ImageSaver
 {
     public:
-        ImageSaver() = default;
+        ImageSaver() :
+            compression_({CV_IMWRITE_JPEG_QUALITY, 100}) 
+        { 
+        }
+
         ImageSaver( const std::vector<int> &compression ) 
             : compression_(compression) { }
 
@@ -299,7 +309,6 @@ class ImageSaver
 
     private:
         std::vector<int> compression_;
-
 };
 
 
@@ -409,7 +418,6 @@ class Resizer
         int size_;
         double  last_scale_;
 };
-
 
 
 

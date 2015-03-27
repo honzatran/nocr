@@ -38,7 +38,6 @@ void trainBoosting(const CvBoostParams & params, const std::string & input,
 
 int main( int argc, char** argv )
 {
-
     std::string input, output;
 
     const std::string er_geom = "ergeom";
@@ -48,10 +47,9 @@ int main( int argc, char** argv )
 
     CvBoostParams params;
     params.boost_type = CvBoost::REAL;
-    params.weak_count = 200;
-    params.max_depth = 10;
-    params.max_categories = 10;
-    params.weight_trim_rate = 0.0;
+    params.weak_count = 50;
+    params.max_depth = 2;
+    params.max_categories = 2;
 
     namespace po = boost::program_options;
     po::options_description desc("Usage");

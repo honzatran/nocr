@@ -204,8 +204,6 @@ class Boost
         {
             sum_ = sum;
         }
-
-
     private:
         CvBoost boost_;
         bool sum_;

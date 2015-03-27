@@ -150,7 +150,7 @@ class HorizontalCrossing : public AbstractFeatureExtractor
          *
          * @return number of horizontal crossing in specific row
          */
-        int getNumberOfCrossingAt( const int &row, const cv::Mat &image );
+        int getNumberOfCrossingAt( int row, const cv::Mat &image );
     private:
 };
 

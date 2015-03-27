@@ -28,7 +28,6 @@ void generate(const std::string & tests_file, const std::string & output)
 
 int main( int argc, char** argv )
 {
-
     std::string input, output;
 
     const std::string er_geom = "ergeom";

@@ -25,9 +25,9 @@
 
 using namespace std;
 
-string er1_conf_file = "boost_er1stage.conf";
+string er1_conf_file = "../boost_er1stage.conf";
 // const string er2_conf_file = "conf/svmERGeom.conf";
-string er2_conf_file = "svm_er2stage.conf";
+string er2_conf_file = "../svm_er2stage.conf";
 
 string icdar_test = "";
 string svt = "";

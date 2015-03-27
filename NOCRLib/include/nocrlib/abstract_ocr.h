@@ -47,7 +47,7 @@ class AbstractOCR
          *
          * Set current image.
          */
-        virtual void setImage( const cv::Mat &image ) { };
+        virtual void setImage( const cv::Mat &image ) { (void)(image); };
 };
 
 #endif /* ocr_interface.h */

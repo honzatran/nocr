@@ -18,6 +18,7 @@
 #include "component.h"
 #include "classifier_wrap.h"
 #include "feature_traits.h"
+#include "utilities.h"
 
 #include <opencv2/core/core.hpp>
 
@@ -33,7 +34,7 @@ class ERFunctionInterface
     public:
         virtual ~ERFunctionInterface() { }
 
-        virtual void setImage( const cv::Mat &image ) { }
+        virtual void setImage( const cv::Mat &image ) { UNUSED(image); }
         virtual float getProbability( const ERRegion &r ) = 0;
 };
 
@@ -308,7 +309,7 @@ class ERTree
          * and maximum probabily in Tree
          *
          */
-        void setMinDifference( double min_difference )
+        void setMinDifference(double min_difference)
         {
             min_delta_ = min_difference;
         }
@@ -415,6 +416,13 @@ class ERTree
 
         std::vector< std::vector<float> > getAllFirstStageDesc() const;
 
+
+        template <typename Functor>
+        void processTree(Functor & functor)
+        {
+            return root_->visit(functor);
+        }
+
     private:
         friend class ComponentTreeBuilder<ERTree>;
         friend class ComponentTreePolicy<ERTree>;
@@ -483,23 +491,23 @@ class ERTree
         void saveTree( NodeType *root, std::vector<NodeType*> &nodes ) const;
 
         template <typename Functor> 
-            bool transformTree( NodeType *root, const Functor &fn )
+        bool transformTree( NodeType *root, const Functor &fn )
+        {
+            bool result = fn( root );
+            NodeType *child = root->child_;
+            while( child != nullptr )
             {
-                bool result = fn( root );
-                NodeType *child = root->child_;
-                while( child != nullptr )
+                NodeType *tmp = child->next_;
+                if ( !transformTree( child, fn ) )
                 {
-                    NodeType *tmp = child->next_;
-                    if ( !transformTree( child, fn ) )
-                    {
-                        child->remove();
-                        delete child;
-                    }
-                    child = tmp;
+                    child->remove();
+                    delete child;
                 }
-
-                return result;
+                child = tmp;
             }
+
+            return result;
+        }
 
         bool isExtremeRegion( NodeType *reg );
         std::pair<float,float> findExtremeParentProb(NodeType *child_region);
@@ -709,6 +717,18 @@ class SegmentationPolicy<ERTextDetection>
 
     private:
         const static double k_epsilon;
+};
+
+class ComponentExtractor
+{
+public:
+    ComponentExtractor() = default;
+
+    void operator() (const ERRegion & er_region);
+
+    std::vector<Component> getExtractedComponents() const;
+private:
+    std::vector<Component> extracted_components_;
 };
 
 #endif /* extremal_region.h */

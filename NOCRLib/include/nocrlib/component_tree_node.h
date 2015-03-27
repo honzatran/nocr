@@ -1,18 +1,3 @@
-// =====================================================================================
-//
-//       Filename:  component_tree_node.h
-//
-//    Description:  
-//
-//        Version:  1.0
-//        Created:  08/10/2014 02:11:58 PM
-//       Revision:  none
-//       Compiler:  g++
-//
-//         Author:  Tran Tuan Hiep (), honza.tran@gmail.com
-//   Organization:  
-//
-// =====================================================================================
 /**
  * @file component_tree_node.h
  * @brief This file contains class ComponentTreeNode, which can be 
@@ -24,6 +9,8 @@
 
 #ifndef NOCRLIB_COMPONENT_TREE_NODE_H
 #define NOCRLIB_COMPONENT_TREE_NODE_H
+
+#include <stack>
 
 /**
  * @brief ComponentTreeNode is an option for node in ComponentTreeBuilder
@@ -174,6 +161,30 @@ class ComponentTreeNode
                 parent_->last_child_ = last_child_;
             }
         }
+
+        template <typename Functor>
+        void visit(Functor & functor)
+        {
+            std::stack<ComponentTreeNode<T> *> stack_node;
+
+            for ( auto * node = child_; node != nullptr; node = node->next_ )
+            {
+                stack_node.push(node);
+            }
+
+            while(!stack_node.empty())
+            {
+                auto * top_stack = stack_node.top();
+                functor(top_stack->getVal());
+                stack_node.pop();
+
+                for ( auto * node = top_stack->child_; node != nullptr; node = node->next_ )
+                {
+                    stack_node.push(node);
+                }
+            }
+        }
+
 
     private:
         T val_;

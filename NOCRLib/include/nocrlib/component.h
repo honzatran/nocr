@@ -231,7 +231,7 @@ class Component
          */
         cv::Rect rectangle() const 
         { 
-            return cv::Rect( cv::Point( left_,upper_ ), cv::Point( right_,lower_ ) ); 
+            return cv::Rect(left_, upper_, getWidth(), getHeight());
         }
 
         /**
@@ -514,6 +514,7 @@ struct ComponentMergeRule
 
     bool canBeMerged( const cv::Point &comp_point, const cv::Point &p ) 
     {
+        (void)(comp_point);
         return image_.at<uchar>(p.y,p.x) > 200;
     }
 };

@@ -92,21 +92,21 @@ void ERRegion::EulerQuadRecord::changeAtQuad(const int *indices, int elemToChang
 
 void ERRegion::EulerQuadRecordBit::update(std::uint16_t quads)
 {
-    std::bitset<4> quad = quads & 0xF;
-    switch(quad.count())
+    std::bitset<4> quad0 = quads & 0xF;
+    switch(quad0.count())
     {
         case 0:
             ++q1_count;
             break;
         case 1:
             --q1_count;
-            if (quad != 1)
+            if (quad0 != 1)
                 ++q2_count;
             else
                 ++q2d_count;
             break;
         case 2:
-            if(quad != 6)
+            if(quad0 != 6)
                 --q2_count;
             else
                 --q2d_count;
@@ -118,22 +118,22 @@ void ERRegion::EulerQuadRecordBit::update(std::uint16_t quads)
             break;
     }
 
-    quad = (quads & 0xF0) >> 4;
+    std::bitset<4> quad1 = (quads & 0xF0) >> 4;
 
-    switch(quad.count())
+    switch(quad1.count())
     {
         case 0:
             ++q1_count;
             break;
         case 1:
             --q1_count;
-            if (quad != 2)
+            if (quad1 != 2)
                 ++q2_count;
             else
                 ++q2d_count;
             break;
         case 2:
-            if(quad != 9)
+            if(quad1 != 9)
                 --q2_count;
             else
                 --q2d_count;
@@ -145,22 +145,22 @@ void ERRegion::EulerQuadRecordBit::update(std::uint16_t quads)
             break;
     }
 
-    quad = (quads & 0xF00) >> 8;
+    std::bitset<4> quad2 = (quads & 0xF00) >> 8;
 
-    switch(quad.count())
+    switch(quad2.count())
     {
         case 0:
             ++q1_count;
             break;
         case 1:
             --q1_count;
-            if (quad != 4)
+            if (quad2 != 4)
                 ++q2_count;
             else
                 ++q2d_count;
             break;
         case 2:
-            if(quad != 9)
+            if(quad2 != 9)
                 --q2_count;
             else
                 --q2d_count;
@@ -172,21 +172,21 @@ void ERRegion::EulerQuadRecordBit::update(std::uint16_t quads)
             break;
     }
 
-    quad = (quads  & 0xF000) >> 12;
-    switch(quad.count())
+    std::bitset<4> quad3 = (quads  & 0xF000) >> 12;
+    switch(quad3.count())
     {
         case 0:
             ++q1_count;
             break;
         case 1:
             --q1_count;
-            if (quad != 8)
+            if (quad3 != 8)
                 ++q2_count;
             else
                 ++q2d_count;
             break;
         case 2:
-            if(quad != 6)
+            if(quad3 != 6)
                 --q2_count;
             else
                 --q2d_count;
@@ -209,6 +209,12 @@ void ERRegion::HorizontalCrossingTracker::
     if ( y < y_min_ ) 
     {
         crossings_.push_front(2); 
+#if PRINT_INFO
+        if (y != y_min_ - 1)
+        {
+            cout << y << " " << y_min_ << endl;
+        }
+#endif
         --y_min_;
         return;
     }
@@ -216,9 +222,16 @@ void ERRegion::HorizontalCrossingTracker::
     if ( y > y_max_ )
     {
         crossings_.push_back(2);
+#if PRINT_INFO
+        if (y != y_max_ + 1)
+        {
+            cout << y << " " << y_max_ << endl;
+        }
+#endif
         ++y_max_;
         return;
     }
+
     crossings_[y - y_min_ ] += actualChange;
 }
 
@@ -490,7 +503,7 @@ Component ERRegion::toComponent() const
     }
 
     out.setLeft( x_min_ - 1 );
-    out.setRight( x_max_ - 1  );
+    out.setRight( x_max_ - 1 );
     out.setUpper( y_min_ - 1);
     out.setLower( y_max_ -1 );
 

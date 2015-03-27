@@ -30,8 +30,9 @@ set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/training)
 add_subdirectory( ./svm-train)
 add_subdirectory( ./train-generator)
 add_subdirectory( ./boosting-train)
-# add_subdirectory( ./ErExtractor )
+add_subdirectory( ./ErExtractor )
 add_subdirectory( ./GtExtractor)
+add_subdirectory( ./1StageDescExtractor)
 
 set (${CMAKE_RUNTIME_OUTPUT_DIRECTORY} ${BIN_OUTPUT})
 

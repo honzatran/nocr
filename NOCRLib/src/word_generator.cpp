@@ -10,6 +10,7 @@
 #include "../include/nocrlib/dictionary.h"
 #include "../include/nocrlib/trie_node.h"
 #include "../include/nocrlib/assert.h"
+#include "../include/nocrlib/utilities.h"
 
 #include <iostream>
 #include <locale>
@@ -473,6 +474,7 @@ WangWordGenerator::WangWordGenerator( const std::vector<Letter>  &letters,
         const LetterWordEquiv &equivalence, const cv::Size &image_size )
     : letters_( letters )
 {
+    UNUSED(image_size);
     size_t size = letters_.size();
     word_equivalance_ = Matrix<double>( size , vector<double>(size, 0) ); 
     distances_ = Matrix<double>( size, vector<double>(size,0) );

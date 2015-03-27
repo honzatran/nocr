@@ -141,6 +141,8 @@ void SwtTransform::makeRecordDistValuePoint
 
 Mat SwtTransform::transform( const Mat &roundDist )
 {
+    (void)(roundDist);
+    
     Mat StrokeWidth = Mat(input_.rows, input_.cols, CV_32FC1, Scalar(0));
     while( !distances_points_.empty() ) 
     {

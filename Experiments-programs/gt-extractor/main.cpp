@@ -20,7 +20,7 @@ struct Record
 };
 
 
-vector<cv::Rect> scanImage(const cv::Mat & image)
+vector<Record> scanImage(const cv::Mat & image)
 {
     const cv::Vec3b white(255, 255, 255);
     vector<Record> detections;
@@ -45,13 +45,7 @@ vector<cv::Rect> scanImage(const cv::Mat & image)
         }
     }
 
-    vector<cv::Rect> output;
-    for (auto it = detections.begin(); it != detections.end(); ++it)
-    {
-        output.push_back(it->rect);
-    }
-
-    return output;
+    return detections;
 }
 
 
@@ -66,7 +60,7 @@ int main(int argc, char ** argv)
     while(getline(cin, line))
     {
         cv::Mat image = cv::imread(line, CV_LOAD_IMAGE_COLOR);
-        vector<cv::Rect> rectangles = scanImage(image);
+        vector<Record> records = scanImage(image);
 
         pugi::xml_node image_node = images.append_child("image");
 
@@ -76,13 +70,20 @@ int main(int argc, char ** argv)
         
         image_name.append_child(pugi::node_pcdata).set_value(file_name.c_str());
 
-        for (const auto &r : rectangles)
+        for (const auto &record : records)
         {
+            cv::Rect r = record.rect;
+
             pugi::xml_node rect_node = image_node.append_child("rectangle");
             rect_node.append_attribute("x") = r.x;
             rect_node.append_attribute("y") = r.y;
             rect_node.append_attribute("width") = r.width;
             rect_node.append_attribute("height") = r.height;
+            auto color_node = rect_node.append_child("rect-color");
+            
+            color_node.append_attribute("b") = record.color[0];
+            color_node.append_attribute("g") = record.color[1];
+            color_node.append_attribute("r") = record.color[2];
 
             // cv::rectangle(image, r, cv::Scalar(0, 0, 255), 2);
         }

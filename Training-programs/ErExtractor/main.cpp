@@ -20,10 +20,26 @@
 
 #define SIZE 1024
 
+class FirstStageDesc
+{
+public:
+    FirstStageDesc(std::ostream * oss, char delim = ':')
+        : output_writer_(oss, delim) { }
+
+    
+    void operator() (const ERRegion & err)
+    {
+        output_writer_.write(err.getFeatures());
+    }
+
+private:
+    OutputWriter output_writer_;
+};
+
 using namespace std;
 
 // string er1_conf_file = "conf/boostGeom.conf";
-string er1_conf_file = "boost_er1stage.conf";
+string er1_conf_file = "../boost_er1stage.conf";
 // const string er2_conf_file = "conf/svmERGeom.conf";
 string directory = "";
 
@@ -52,7 +68,6 @@ int parseCmd(int argc, char ** argv)
         ("icdar-xml", po::value<string>(&icdar_xml), "path to xml icdar file")
         ("icdar-dir", po::value<string>(&icdar_dir), "path to xml icdar file");
          
-
     try 
     {
         po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
@@ -161,7 +176,6 @@ void draw( const std::vector<T> &objects,
 
 int main( int argc, char **argv )
 {
-    
     if (parseCmd(argc, argv) != 0)
     {
         return 1;
@@ -194,23 +208,8 @@ int main( int argc, char **argv )
         er2_desc_out.open(er2_neg);
     }
 
-    /*
-     * LetterDetectionTesting  letter_testing;
-
-     * ICDARGroundTruth icdar;
-     * cout << icdar_xml << endl;
-     * icdar.loadFromFile(icdar_xml);
-
-     * letter_testing.loadGroundTruth( &icdar );
-     * vector<string> file_paths = icdar.getFilesPath();
-     */
-
-    // for ( const string &s : file_paths)
     while( std::getline(cin, line))
     {
-        // string file_path = icdar_dir + '/' + s;
-
-        // cv::Mat image = cv::imread(file_path, CV_LOAD_IMAGE_GRAYSCALE);
         cv::Mat image = cv::imread(line, CV_LOAD_IMAGE_GRAYSCALE);
         string file_name = getFileName(line);
 
@@ -262,8 +261,10 @@ int main( int argc, char **argv )
 
         if (!directory.empty())
         {
-            cv::imwrite( directory + '/' + file_name,
-                    rectangle_drawer.getImage());
+            stringstream ss;
+            ss << directory << "/" << file_name;
+            cout << ss.str() << endl;
+            cv::imwrite( ss.str(), rectangle_drawer.getImage());
         }
         else
         {

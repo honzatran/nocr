@@ -68,7 +68,7 @@ struct ErTreeBuildTask
 
     const double k_min_area_ratio = 0.00007;
     const double k_max_area_ratio = 0.3;
-    const string k_er1_conf_file = "boost_er1stage.conf";
+    const string k_er1_conf_file = "../boost_er1stage.conf";
 };
 
 template <> 
@@ -93,7 +93,6 @@ struct RunTask<ErTreeBuildTask, std::vector<cv::Mat> >
             task.er_tree.rejectSimilar();
             auto tmp = task.er_tree.toComponent();
             comps.insert(comps.end(), tmp.begin(), tmp.end());
-            cout << comps.size() << endl;
             task.er_tree.deallocateTree();
         }
     }

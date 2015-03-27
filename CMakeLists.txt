@@ -18,7 +18,7 @@ include_directories( ${NOCR_SOURCE_DIR}/External-libraries/liblinear-1.94/ )
 include_directories( ${NOCR_SOURCE_DIR}/External-libraries/pugixml/ )
     
 if (UNIX)
-    add_compile_options(-std=c++0x -Wall -ggdb -Wextra)
+    add_compile_options(-std=c++0x -Wall -ggdb -Wextra -msse4.2)
 endif(UNIX)
 
 add_subdirectory( ./External-libraries)

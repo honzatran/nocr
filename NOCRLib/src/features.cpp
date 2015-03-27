@@ -2,6 +2,7 @@
 #include "../include/nocrlib/iooper.h"
 #include "../include/nocrlib/component.h"
 #include "../include/nocrlib/assert.h"
+#include "../include/nocrlib/utilities.h"
 
 #include <opencv2/core/core.hpp>
 
@@ -68,6 +69,7 @@ std::vector<float> BackgroundMergeRule::compute( Component &c )
 
 bool BackgroundMergeRule::canBeMerged( Point pointOfComponent, Point outsidePoint )
 {
+    UNUSED(pointOfComponent);
     uchar outsidePointVal = bitmap_.at<uchar>( outsidePoint.y, outsidePoint.x );
 
     // int key = outsidePoint.y * bitmap_.cols + outsidePoint.x;
@@ -246,7 +248,7 @@ std::vector<float> HorizontalCrossing::compute( Component &c )
 
 }
 
-int HorizontalCrossing::getNumberOfCrossingAt( const int &rowIndex, const cv::Mat &image )
+int HorizontalCrossing::getNumberOfCrossingAt( int rowIndex, const cv::Mat &image )
 {
     cv::Mat row = image.row( rowIndex );
     int horizontalCrossing = 0;

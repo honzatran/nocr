@@ -35,12 +35,11 @@ int main(int argc, char ** argv)
 
     while (getline(cin, line))
     {
-        cout << line << endl;
         cv::Mat image = cv::imread(line, CV_LOAD_IMAGE_GRAYSCALE);
         images.push_back(image);
     }
 
-    MeasureTask<ErTreeBuildTask, vector<cv::Mat>, 1> measuring;
+    MeasureTask<ErTreeBuildTask, vector<cv::Mat>, 100> measuring;
     cout << measuring.measureWallClockTime(task, images) 
         << " ms" << endl;
 
