@@ -50,6 +50,17 @@ template <feature F> struct LoadTrainData
 
 /// @endcond
 
+template <template <feature>  class C, feature F>
+std::shared_ptr< C<F> > create()
+{
+    return std::shared_ptr< C<F> >(new C<F>());
+}
+
+template <template <feature>  class C, feature F, typename... ARGS>
+std::shared_ptr< C<F> > create(ARGS &&... args)
+{
+    return std::shared_ptr< C<F> >(new C<F>(std::forward<ARGS>(args)...));
+}
 
 /**
  * @brief wrap of opencv desion tree class
@@ -135,10 +146,6 @@ template < feature F >
 class Boost
 {
     public:
-        Boost() { }
-        ~Boost() { }
-
-        
         /**
          * @brief train boosting classificators
          *

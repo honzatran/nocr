@@ -48,8 +48,9 @@ int main(int argc, char ** argv)
     ERFilter1StageFactory factory;
     auto ptr = factory.createFeatureExtractor();
 
-
-    auto boosting = cv::ml::StatModel::create<cv::ml::Boost>(k_boost_conf);
+    auto boosting = create<Boost, feature::ERGeom>();
+    boosting->loadConfiguration(k_boost_conf);
+    boosting->setReturningSum(true);
 
     std::map<char, LetterRecord> letter_records;
     cout << std::fixed;
@@ -79,7 +80,7 @@ int main(int argc, char ** argv)
         TrainExtractionPolicy<extraction::BWMaxComponent> policy;
         Component c = policy.extract(image)[0];
         vector<float> desc = ptr->compute(c);
-        float sum = boosting->predict(cv::Mat(desc), cv::noArray(), cv::ml::Boost::PREDICT_SUM| cv::ml::Boost::RAW_OUTPUT);
+        float sum = boosting->predict(cv::Mat(desc));
 
         float prob = 1/(1 + std::exp( -2 * sum ));
         cout << getFileName(line) << " " << prob << endl;

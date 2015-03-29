@@ -122,8 +122,6 @@ int main(int argc, char ** argv)
     ERFilter1StageFactory factory;
     auto ptr = factory.createFeatureExtractor();
 
-    auto boosting = cv::ml::StatModel::create<cv::ml::Boost>(k_boost_conf);
-
     TestLetter test;
     test.loadXml(argv[1]);
 
@@ -131,6 +129,10 @@ int main(int argc, char ** argv)
     int count = 0;
 
     ifstream input(argv[2]);
+
+    auto boosting = create<Boost, feature::ERGeom>();
+    boosting->loadConfiguration(k_boost_conf);
+    boosting->setReturningSum(true);
 
     while (getline(input,line))
     {
@@ -151,7 +153,7 @@ int main(int argc, char ** argv)
             }
 
             vector<float> desc = ptr->compute(c);
-            float sum = boosting->predict(cv::Mat(desc), cv::noArray(), cv::ml::Boost::PREDICT_SUM| cv::ml::Boost::RAW_OUTPUT);
+            float sum = boosting->predict(cv::Mat(desc));
 
             float prob = 1/(1 + std::exp( -2 * sum ));
 
