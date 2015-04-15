@@ -1,6 +1,7 @@
 
 #include <pugi/pugixml.hpp>
 #include "extractor.hpp"
+#include <algorithm>
 
 void 
 TruePositiveExtractor ::loadXml(const std::string & xml_file)
@@ -71,7 +72,8 @@ TruePositiveExtractor::operator()(ERRegion & err)
 
     if ((positive_ && is_letter) || (!positive_ && !is_letter))
     {
-        output_->save(err, current_it_->first, it->letter);
+        char c = positive_ && is_letter ? it->letter : 'n';
+        output_->save(err, current_it_->first, c);
     }
 }
 
@@ -88,8 +90,22 @@ TruePositiveExtractor::areMatching(
         return false;
     }
 
-    bool gt_condition = (double)intersection.area()/gt_rect.area() > 0.8;
+    bool gt_condition = (double)intersection.area()/gt_rect.area() > 0.7;
     bool detected_condition = (double)intersection.area()/c_rect.area() > 0.4;
 
     return gt_condition && detected_condition;
+}
+
+void 
+TruePositiveExtractor::notifyResize(double scale)
+{
+    std::for_each(current_it_->second.begin(), current_it_->second.end(), 
+            [scale] (LetterRecord & rec)
+            {
+                cv::Point tl_rect = rec.rect.tl();
+                cv::Point br_rect = rec.rect.br();
+
+                cv::Rect scaled_rect = cv::Rect(scale * tl_rect,scale * br_rect);
+                rec.rect = scaled_rect;
+            });
 }

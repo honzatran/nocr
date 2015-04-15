@@ -1,5 +1,3 @@
-find_package( Boost COMPONENTS program_options REQUIRED )
-
 set (bin_exec GtExtractor)
 
 add_executable( ${bin_exec} main.cpp )

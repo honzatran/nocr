@@ -77,10 +77,10 @@ class RectangleDrawer : public DrawerInterface
         void draw( const Word &w ) override;
 
         cv::Mat getImage() override { return canvas_; } 
-    private:
-        cv::Mat canvas_;
 
         void drawRectangle( const cv::Rect &rect, const cv::Scalar &color = cv::Scalar( 0, 0, 255 ) );
+    private:
+        cv::Mat canvas_;
 };
 
 

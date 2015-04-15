@@ -8,8 +8,6 @@
 #  ../headers/preprocesing.cpp
 #  )
 
-
-find_package( Boost COMPONENTS program_options REQUIRED )
 set (bin_exec TrainBoosting)
 
 add_executable( ${bin_exec} main_desTree.cpp )

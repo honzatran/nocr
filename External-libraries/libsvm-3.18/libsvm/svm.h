@@ -102,6 +102,17 @@ double sigmoid_predict(double decision_value, double A, double B);
 // this function will be removed in future release
 void svm_destroy_model(struct svm_model *model_ptr); 
 
+
+// additional function Tran Tuan Hiep 
+// used by NOCR library
+//
+const char * svm_get_type(int i);
+const char * svm_get_kernel_type(int i);
+int get_svm_type_indx(const char * type);
+int get_kernel_type_indx(const char * type);
+
+
+
 #ifdef __cplusplus
 }
 #endif

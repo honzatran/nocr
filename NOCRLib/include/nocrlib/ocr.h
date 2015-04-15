@@ -99,7 +99,9 @@ class MyOCR : public AbstractOCR
             hog_ = factory.createFeatureExtractor();
         }
         
-        ~MyOCR() { }
+        ~MyOCR() 
+        { 
+        }
 
         char translate( Component &c, std::vector<double> &probabilities ) override;
     private:

@@ -8,6 +8,7 @@
 #include <map>
 #include <vector>
 #include <fstream>
+#include <limits>
 
 #include <nocrlib/extremal_region.h>
 #include <nocrlib/component_tree_builder.h>
@@ -34,7 +35,7 @@ public:
     DescriptorOutput(std::ostream * oss, int label) 
         : oss_(oss), label_(label)
     {
-
+        oss_->precision(std::numeric_limits<float>::digits10);
     }
 
     void save(ERRegion & err, 
@@ -46,7 +47,7 @@ public:
         std::vector<float> desc = err.getFeatures();
         for (float f : desc) 
         {
-            *oss_ << f << ":";
+            *oss_ << f << ' ';
         }
 
         *oss_ << label_ << std::endl;
@@ -102,6 +103,7 @@ public:
                 factory.getOnly2StageFeatureExtractor());
 
         ofs_.open(output);
+        ofs_.precision(std::numeric_limits<float>::digits10);
     }
 
     void save(ERRegion & err, 
@@ -118,12 +120,7 @@ public:
 
         for (float f : basic_desc)
         {
-            ofs_ << f << ':';
-        }
-
-        for (float f : additional_2stage_desc)
-        {
-            ofs_ << f << ':';
+            ofs_ << f << ' ';
         }
 
         ofs_ << 0 << std::endl;
@@ -142,12 +139,10 @@ using namespace std;
 
 int main( int argc, char **argv )
 {
-
-    string er1_conf_file = "../boost_er1stage.conf";
+    string er1_conf_file = "../boost_er1stage_resized.xml";
     double min_area_ratio = 0.00007;
     double max_area_ratio = 0.3;
 
-    string er1_neg = "";
     string er2_neg = "";
 
     bool component_type_saving = false;
@@ -155,6 +150,7 @@ int main( int argc, char **argv )
     bool detect_positive = true;
     std::string extract_2stage_desc = "";
     string output;
+    string er2stage_comp_output = "";
 
     namespace po = boost::program_options;
     po::variables_map vm;
@@ -166,13 +162,13 @@ int main( int argc, char **argv )
         ("er1-conf-file", po::value<string>(&er1_conf_file),"path to er 1 stage Boosting conf")
         ("min-area", po::value<double>(&min_area_ratio), "minimal area of nodes")
         ("max-area", po::value<double>(&max_area_ratio), "maximal area of node")
-        ("first-stage", po::value<string>(&er1_neg), "output file with all negative descriptors")
         ("detect-negative", "detecting false component")
         ("component-output", po::value<string>(&output), 
              "save detected er tree node to directory")
         ("desc-output", po::value<string>(&output))
         ("xml-input,x", po::value<string>(&xml_input))
-        ("2stage-desc", po::value<string>(&extract_2stage_desc),"extract second stage descriptor");
+        ("2stage-desc", po::value<string>(&extract_2stage_desc),"extract second stage descriptor")
+        ("2stage-comp-output", po::value<string>(&er2stage_comp_output),"save second stage component to dir");
     
     try 
     {
@@ -244,17 +240,32 @@ int main( int argc, char **argv )
 
     std::unique_ptr<AbstractOutput> ptr;
     std::ofstream ofs;
+
+    bool er2_stage = !(extract_2stage_desc.empty() && er2stage_comp_output.empty());
     if (component_type_saving)
     {
         ptr = std::unique_ptr<AbstractOutput>(new ComponentOutput(output));
     }
     else 
     {
-        if (!extract_2stage_desc.empty())
+        if (er2_stage)
         {
-            ptr = std::unique_ptr<AbstractOutput>(new ER2StageDesc(extract_2stage_desc));
+            AbstractOutput * tmp = nullptr;
+                
+            if (extract_2stage_desc.empty())
+            {
+                tmp = new ComponentOutput(er2stage_comp_output);
+            }
+            else
+            {
+                tmp = new ER2StageDesc(extract_2stage_desc);
+            }
+
+
+            ptr = std::unique_ptr<AbstractOutput>(tmp);
             er_tree.setMinGlobalProbability(0.2);
             er_tree.setMinDifference(0.1);
+            er_tree.setDelta(4);
         }
         else
         {
@@ -277,14 +288,29 @@ int main( int argc, char **argv )
 
     extractor.setOutput(ptr.get());
 
-    bool transform_extreme = !extract_2stage_desc.empty();
+    bool transform_extreme = er2_stage;
+    Resizer resizer;
+    resizer.setSize(SIZE);
 
-    while( std::getline(cin, line))
+    while(std::getline(cin, line))
     {
         cv::Mat image = cv::imread(line, cv::IMREAD_GRAYSCALE);
+
         string file_name = getFileName(line);
         extractor.setFileImage(file_name);
-        cout << line << endl;
+
+        if ( image.rows < SIZE && image.cols < SIZE )
+        {
+            image = resizer.resizeKeepAspectRatio(image);
+            extractor.notifyResize(resizer.getLastScale());
+        }
+
+        std::tie(min_area_ratio, max_area_ratio) =
+            ErLimitSize::getErSizeLimits(image.size());
+
+        er_tree.setMinAreaRatio(min_area_ratio);
+        er_tree.setMaxAreaRatio(max_area_ratio);
+
         if (image.empty())
         {
             continue;
@@ -296,6 +322,7 @@ int main( int argc, char **argv )
         {
             er_tree.transformExtreme();
         }
+        er_tree.rejectSimilar();
 
         er_tree.processTree(extractor);
 
@@ -308,6 +335,7 @@ int main( int argc, char **argv )
         {
             er_tree.transformExtreme();
         }
+        er_tree.rejectSimilar();
 
         er_tree.processTree(extractor);
         er_tree.deallocateTree();

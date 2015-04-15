@@ -14,8 +14,45 @@
 #include <fstream>
 #include <sstream>
 
+#include <pugi/pugixml.hpp>
+
+#define DEBUG 0
+#define FAST_EVAL 1
+
+#define IKSVM_ROOT_TAG "iksvm"
+#define IKSVM_NR_CLASS_TAG "nr-class"
+#define IKSVM_FEAT_DIM_TAG "feat-dim"
+#define IKSVM_PROB_A_TAG "prob-A"
+#define IKSVM_PROB_B_TAG "prob-B"
+#define IKSVM_LABELS_TAG "labels"
+#define IKSVM_DFS_TAG "decision-functions-list"
+#define IKSVM_DF_TAG "decision-function"
+#define IKSVM_INDX_TAG "indx"
+#define IKSVM_COUNT_TAG "count"
+#define IKSVM_DIM_TAG "dimension"
+#define IKSVM_STEP_TAG "step"
+#define IKSVM_MIN_SAMPLE_TAG "min-sample"
+#define IKSVM_DIM_FUNC_TAG "dim-function"
+
 
 using namespace std;
+
+///util function
+
+template <typename T>
+std::string toString(const std::vector<T> & values, char delim = ' ')
+{
+    std::stringstream ss;
+    for (std::size_t i = 0; i < values.size() - 1; ++i)
+    {
+        ss <<  values[i] << delim;
+    }
+    ss << values.back();
+
+    return ss.str();
+}
+
+
 
 
 const double ApproximatedFunction::epsilon_ = 0.000001;
@@ -88,29 +125,67 @@ std::ostream& operator<<( std::ostream &oss, const ApproximatedFunction &fnc )
 DecisionFunction::DecisionFunction( 
         const std::vector<ApproximatedFunction> &approximated_functions, 
         double b )
-    : approximated_functions_( approximated_functions ), b_(b)
+    : b_(b)
 {
-    approximated_functions_.shrink_to_fit();
+    for (const auto & fc: approximated_functions)
+    {
+        step_size_.push_back(std::make_pair(fc.getStepSize(), fc.getMinSample()));
+        auto tmp = fc.getFunctionValues();
+        function_values_.insert(function_values_.end(), tmp.begin(), tmp.end());
+    }
 }
 
 double DecisionFunction::compute( const std::vector<double> &x )
 {
     double value = b_;
+    //tady pujde sse
+    int num_steps = fuction_approx_count_ - 1;
     for ( size_t i = 0; i < x.size(); ++i )
     {
-        value += approximated_functions_[i].getValueAt(x[i]);
+        // double tmp1 =  approximated_functions_[i].getValueAt(x[i]);
+        // jsem se presune kod z ApproxFunction::compute
+        std::size_t indx = i * fuction_approx_count_;
+        double step_size, min_sample;
+        std::tie(step_size, min_sample) = step_size_[i];
+
+        double f_interpolation = (x[i] - min_sample)/step_size;
+
+        int left = std::floor(f_interpolation);
+        int right = left + 1;
+
+        left = std::min(left, num_steps);
+        left = left > 0 ? left : 0;
+        right = std::min(right, num_steps);
+        right = right > 0 ? right : 0;
+
+        double alpha = f_interpolation - left;
+        double f_left = function_values_[indx + left];
+        double f_right = function_values_[indx + right];
+
+        value += ( 1 - alpha ) * f_left + alpha * f_right;
     }
+
     return value;
 }
 
 std::ostream& operator<<( std::ostream &oss, const DecisionFunction &fnc )
 {
-    oss << fnc.b_ << " ";
-    for ( const auto &fn : fnc.approximated_functions_ )
+    std::size_t fuction_approx_count = fnc.fuction_approx_count_;
+    std::size_t features_dim = fnc.feature_dim_;
+
+    for (std::size_t i = 0; i < features_dim; ++i)
     {
-        oss << fn << " ";
+        int indx = i * fuction_approx_count;
+        oss << fnc.step_size_[i].first << ";" << fnc.step_size_[i].second << ";";
+         
+        for (std::size_t j = 0; j < fuction_approx_count - 1; ++j)
+        {
+            oss << fnc.function_values_[indx + j] << ":";
+        }
+         
+        oss << fnc.function_values_[indx + fuction_approx_count - 1] << " "; 
     }
-    
+
     return oss;
 }
 
@@ -120,14 +195,16 @@ void DecisionFunction::loadFromString( const std::string &s, int features_dim )
     std::stringstream ss(s);
     ss >> b_;
 
-    approximated_functions_.reserve( features_dim );
+    feature_dim_ = features_dim;
+
+    function_values_.reserve(features_dim * 15);
+    string sample_function_str;
+     
     for ( int i = 0; i < features_dim; ++i )
     {
-        string sample_function_str;
         if (ss >> sample_function_str)
         {
-            approximated_functions_.push_back ( 
-                    strToApproxFunction(sample_function_str) ); 
+            strToApproxFunction(sample_function_str);
         } 
         else
         {
@@ -136,7 +213,7 @@ void DecisionFunction::loadFromString( const std::string &s, int features_dim )
     }
 }
 
-ApproximatedFunction DecisionFunction::strToApproxFunction(const std::string &s)
+void DecisionFunction::strToApproxFunction(const std::string &s)
 {
     std::stringstream ss(s);
     std::string token;
@@ -150,12 +227,19 @@ ApproximatedFunction DecisionFunction::strToApproxFunction(const std::string &s)
     std::stringstream ss1( token );
     std::vector<double> function_values;
     string tmp;
+    
     while( getline(ss1,tmp,':') )
     {
         function_values.push_back(std::stod(tmp));
     }
-    return ApproximatedFunction( min_sample, step_size ,function_values );
+
+    function_values_.insert(function_values_.end(), function_values.begin(), function_values.end());
+    
+    step_size_.push_back(std::make_pair(step_size, min_sample));
+
+    fuction_approx_count_ = function_values.size();
 }
+ 
 
 
 
@@ -214,7 +298,7 @@ IKSVM IKSVMConvertor::createFromSvmProblem( svm_model *model, int num_segment )
         }
     }
 
-    return IKSVM( nr_class_, features_dim_, prob_a, prob_b, desicion_functions, labels ); 
+    return IKSVM( nr_class_, features_dim_, num_segment, prob_a, prob_b, desicion_functions, labels ); 
 }
 
 vector<int> IKSVMConvertor::getStartsOfSv()
@@ -357,6 +441,7 @@ ApproximatedFunction IKSVMConvertor::approximateFunction(
 //
 const std::string IKSVM::number_class_text = "number of classes";
 const std::string IKSVM::feature_dimension_text = "feature dimension";
+const std::string IKSVM::approx_count = "approx count";
 const std::string IKSVM::probA_text = "prob A";
 const std::string IKSVM::probB_text = "prob B";
 const std::string IKSVM::label_text = "labels";
@@ -364,18 +449,30 @@ const std::string IKSVM::decision_function_text = "decision functions";
 
 
 
-IKSVM::IKSVM( int nr_class, int features_dim,
+IKSVM::IKSVM( int nr_class, int features_dim, int approx_count,
         const std::vector<double> prob_A, const std::vector<double> prob_B,
-        const std::vector<DecisionFunction> desicion_functions, 
+        const std::vector<DecisionFunction> decision_function, 
         const std::vector<double> labels )
-    : nr_class_(nr_class), features_dim_(features_dim),
-    prob_A_(prob_A), prob_B_(prob_B),
-    desicion_functions_(desicion_functions), labels_(labels)
+    : nr_class_(nr_class), features_dim_(features_dim), approx_count_(approx_count),
+    prob_A_(prob_A), prob_B_(prob_B), labels_(labels)
 {
+    int number_subproblems = decision_function.size();
+    decision_values_b_.resize(number_subproblems);
+    decision_function_.resize(number_subproblems * features_dim_ * approx_count_);
+    decision_function_info_.resize(number_subproblems * features_dim_);
 
+    for (std::size_t i = 0;i < decision_function.size(); ++i)
+    {
+        decision_values_b_[i] = decision_function[i].b_;
+        auto info = decision_function[i].step_size_;
+        decision_function_info_.insert(decision_function_info_.end(),
+                info.begin(), info.end());
+
+        auto values = decision_function[i].function_values_;
+        decision_function_.insert(decision_function_.end(),
+                values.begin(), values.end());
+    }
 }
-
-
 
 void IKSVM::save( const std::string &file_name )
 {
@@ -389,7 +486,93 @@ void IKSVM::save( const std::string &file_name )
      * }
      */
 
-    cout << desicion_functions_.size() << endl;
+    ofs << number_class_text << ':' << nr_class_ << endl;
+    ofs << feature_dimension_text << ':' << features_dim_ << endl;
+    ofs << approx_count  << ':' << approx_count_ << endl;
+
+
+    ofs << probA_text << ':';
+    for( double d : prob_A_ )
+    {
+        ofs << d << " ";
+    }
+    ofs << endl;
+
+    ofs << probB_text << ':';
+    for( double d : prob_B_ )
+    {
+        ofs << d << " ";
+    }
+    ofs << endl;
+
+    ofs << label_text << ':';
+    for ( double d: labels_ )
+    { 
+         ofs << d << " ";
+    }
+    ofs << endl;
+    ofs << decision_function_text << endl;
+
+    int num_class = nr_class_ * (nr_class_ - 1) / 2;
+    double step_size, min_sample;
+
+    for (int i = 0; i < num_class; ++i)
+    {
+        ofs << decision_values_b_[i] << " ";
+        for (int j = 0; j < features_dim_; ++j)
+        {
+            std::tie(step_size, min_sample) = decision_function_info_[i * features_dim_ + j];
+            ofs << step_size << ';' << min_sample << ';';
+            std::size_t dec_fn_idx = (i * features_dim_  + j) * approx_count_;
+
+            for (int k = 0; k < approx_count_ - 1; ++k)
+            {
+                ofs << decision_function_[dec_fn_idx + k] << ':';
+            }
+
+            ofs << decision_function_[dec_fn_idx + approx_count_ - 1] << " ";
+        }
+
+        ofs << endl;
+    }
+
+    ofs.close();
+}
+
+void IKSVM::saveXml( const std::string &file_name )
+{
+    pugi::xml_document doc;
+    auto root = doc.append_child(IKSVM_ROOT_TAG);
+    root.append_child(IKSVM_NR_CLASS_TAG).text().set(nr_class_);
+    root.append_child(IKSVM_FEAT_DIM_TAG).text().set(features_dim_);
+    root.append_child(IKSVM_PROB_A_TAG).text().set(toString(prob_A_).c_str());
+    root.append_child(IKSVM_PROB_B_TAG).text().set(toString(prob_B_).c_str());
+    root.append_child(IKSVM_LABELS_TAG).text().set(toString(labels_).c_str());
+    auto decision_fnc_node = root.append_child(IKSVM_DFS_TAG);
+    int num_class = nr_class_ * (nr_class_ - 1)/ 2;
+    decision_fnc_node.append_attribute(IKSVM_COUNT_TAG).set_value(num_class);
+
+    // for (std::size_t i = 0; i < desicion_functions_.size(); ++i)
+    // {
+    //     auto df_node = decision_fnc_node.append_child(IKSVM_DF_TAG);
+    //     df_node.append_attribute(IKSVM_INDX_TAG).set_value(i);
+    //     saveXmlDF(df_node, desicion_functions_[i]);
+    // }
+    
+
+
+
+    std::ofstream ofs( file_name );
+
+    /*
+     * if ( !ofs.is_open() )
+     * {
+     *     throw Exception;
+
+     * }
+     */
+
+    cout << num_class << endl;
     ofs << number_class_text << ':' << nr_class_ << endl;
     ofs << feature_dimension_text << ':' << features_dim_ << endl;
 
@@ -414,13 +597,31 @@ void IKSVM::save( const std::string &file_name )
     }
     ofs << endl;
 
-    ofs << decision_function_text << endl;
-    for ( const auto &des_fnc: desicion_functions_ )
-    {
-        ofs << des_fnc << endl;
-    }
+    // ofs << decision_function_text << endl;
+    // for ( const auto &des_fnc: desicion_functions_ )
+    // {
+    //     ofs << des_fnc << endl;
+    // }
 
+    doc.save(ofs);
     ofs.close();
+}
+
+void IKSVM::saveXmlDF(pugi::xml_node & df_node, const DecisionFunction & fn)
+{
+    // auto feature_dim_nodes = df_node.append_child(IKSVM_DIM_FUNC_TAG);
+    /*
+     * for (int i = 0; i < feature_dim_; ++i)
+     * {
+     *
+     *     df_node.append_child(IKSVM_MIN_SAMPLE_TAG).text().set(fn.min_sample_);
+     *     df_node.append_child(IKSVM_STEP_TAG).text().set(fn.step_);
+     *     auto dim_fn = features_dim_nodes.append(child);
+     *     dim_fn.append_attribute(IKSVM_DIM_TAG).set_value(i);
+     *     //parseString dim_fn;
+     * }
+     */
+    
 }
 
 void IKSVM::load( const std::string &file_name )
@@ -439,6 +640,8 @@ void IKSVM::load( const std::string &file_name )
     std::getline(ifs, line);
     features_dim_ = std::stoi(parse( feature_dimension_text, line ));
     std::getline(ifs, line);
+    approx_count_ = std::stoi(parse( approx_count, line));
+    std::getline(ifs, line);
     prob_A_ = strToVec(parse( probA_text, line ));
     std::getline(ifs, line);
     prob_B_ = strToVec(parse( probB_text, line ));
@@ -452,22 +655,66 @@ void IKSVM::load( const std::string &file_name )
     }
 
     int number_subproblems = nr_class_ * (nr_class_ - 1) / 2;
-    desicion_functions_.reserve( number_subproblems );
+    decision_values_b_.resize(number_subproblems);
+    decision_function_.resize(number_subproblems * features_dim_ * approx_count_);
+    decision_function_info_.resize(number_subproblems * features_dim_);
+
     for ( int i = 0; i < number_subproblems; ++i )
     {
         if ( std::getline( ifs, line ) )
         {
-            DecisionFunction fnc;
-            fnc.loadFromString(line, features_dim_);
-            desicion_functions_.push_back( fnc ); 
+            parseDecisionFunction(line, i);
         }
         else 
         {
             throw BadFileFormatting("");
         }
     }
-    desicion_functions_.shrink_to_fit();
+
 }
+
+void IKSVM::parseDecisionFunction(const std::string & line, std::size_t indx)
+{
+    std::stringstream ss(line);
+    ss >> decision_values_b_[indx];
+
+    string sample_function_str;
+     
+    for ( int i = 0; i < features_dim_; ++i )
+    {
+        string dim_fn_line;
+        ss >> dim_fn_line;
+
+        std::stringstream ss1(dim_fn_line);
+        string token;
+        std::getline(ss1,token, ';');
+        double step_size = std::stod(token);
+        std::getline(ss1,token, ';');
+        double min_sample = std::stod(token);
+        std::getline(ss1,token, ';');
+
+
+        decision_function_info_[indx * features_dim_ + i] = std::make_pair(step_size, min_sample);
+
+#if DEBUG
+        // std::cout << i << " "<< token  << std::endl;
+        std::cout << token  << std::endl;
+#endif
+        
+        std::stringstream parser_fn_dim(token);
+        string tmp;
+        int j = indx * features_dim_ * approx_count_ + i * approx_count_;
+        for (int k = 0; k < approx_count_; ++k)
+        {
+            std::getline(parser_fn_dim, tmp, ':');
+#if DEBUG
+            std::cout << tmp << std::endl;
+#endif
+            decision_function_[j + k] = std::stod(tmp);
+        }
+    }
+}
+        
 
 bool IKSVM::startsWith( const std::string &s, const std::string &start )
 {
@@ -527,8 +774,9 @@ double IKSVM::computeDecisionsValue( const std::vector<double> &x,
     {
         for ( int j = i + 1; j < nr_class_; ++j )
         {
-            double decision_value = desicion_functions_[p].compute(x);
+            double decision_value = evalDecisionFunction(p, x);
             decision_values[p] = decision_value;
+
             if ( decision_value > 0 )
             {
                 votes[i] += 1;
@@ -540,6 +788,7 @@ double IKSVM::computeDecisionsValue( const std::vector<double> &x,
             ++p;
         }
     }
+
     size_t max_idx = 0;
     for ( size_t i = 1; i < votes.size(); ++i ) 
     {
@@ -550,6 +799,40 @@ double IKSVM::computeDecisionsValue( const std::vector<double> &x,
     }
     return labels_[max_idx];
 }
+
+double IKSVM::evalDecisionFunction(std::size_t indx, const std::vector<double> & x)
+{
+    double value = decision_values_b_[indx];
+    //tady pujde sse
+    int num_steps = approx_count_ - 1;
+    for ( size_t i = 0; i < x.size(); ++i )
+    {
+        // double tmp1 =  approximated_functions_[i].getValueAt(x[i]);
+        // jsem se presune kod z ApproxFunction::compute
+        double step_size, min_sample;
+        std::tie(step_size, min_sample) = decision_function_info_[indx * features_dim_ + i];
+
+        double f_interpolation = (x[i] - min_sample)/step_size;
+
+        int left = std::floor(f_interpolation);
+        int right = left + 1;
+
+        left = std::min(left, num_steps);
+        left = left > 0 ? left : 0;
+        right = std::min(right, num_steps);
+        right = right > 0 ? right : 0;
+
+        std::size_t dec_fn_indx = (indx * features_dim_ + i) * approx_count_;
+        double alpha = f_interpolation - left;
+        double f_left = decision_function_[dec_fn_indx + left];
+        double f_right = decision_function_[dec_fn_indx + right];
+
+        value += ( 1 - alpha ) * f_left + alpha * f_right;
+    }
+
+    return value;
+}
+
 
 std::pair<double, std::vector<double> > IKSVM::predictProbability
                                         ( const std::vector<double> &x )

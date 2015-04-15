@@ -116,7 +116,6 @@ void buildTree(ERTree & er_tree,
 {
     builder.buildTree();
     er_tree.transformExtreme();
-    er_tree.rejectSimilar();
 }
 
 void computeERDescriptor( 
@@ -186,6 +185,7 @@ int main( int argc, char **argv )
     ERTree er_tree(min_area_ratio, max_area_ratio);
     er_tree.setMinGlobalProbability(0.2);
     er_tree.setMinDifference(0.1);
+    er_tree.setDelta(4);
 
     std::unique_ptr<ERFilter1Stage> er_function( new ERFilter1Stage() );
     er_function->loadConfiguration(er1_conf_file);
@@ -195,6 +195,9 @@ int main( int argc, char **argv )
 
     std::unique_ptr<DrawerInterface> bin_drawer( new BinaryDrawer() );
     std::unique_ptr<DrawerInterface> rect_drawer( new RectangleDrawer() );
+
+    Resizer resizer;
+    resizer.setSize(SIZE);
 
     std::ofstream er1_desc_out, er2_desc_out;
 
@@ -214,6 +217,17 @@ int main( int argc, char **argv )
         string file_name = getFileName(line);
 
         cout << line << endl;
+
+        if (image.rows < SIZE && image.cols < SIZE)
+        {
+            image = resizer.resizeKeepAspectRatio(image);
+        }
+
+        std::tie(min_area_ratio, max_area_ratio) =
+            ErLimitSize::getErSizeLimits(image.size());
+
+        er_tree.setMinAreaRatio(min_area_ratio);
+        er_tree.setMaxAreaRatio(max_area_ratio);
 
         er_tree.setImage(image);
         buildTree( er_tree, builder );
@@ -238,7 +252,7 @@ int main( int argc, char **argv )
         
         cout << components.size() << endl;
 
-        if (!er1_neg.empty() )
+        if (!er1_neg.empty())
         {
             OutputWriter output(&er1_desc_out);
             computeERDescriptor(er_tree, output);

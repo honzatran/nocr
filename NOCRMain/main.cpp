@@ -34,8 +34,8 @@ int main ( int argc, char** argv )
     std::string dict = "conf/dict";
     vector<string> input_lists;
 
-    std::string svm_ER2Phase = "svm_er2stage.conf";
 
+    std::string svm_ER2Phase = "scaled_svmEr2.xml";
     namespace po = boost::program_options;
     po::options_description desc("Usage");
     desc.add_options()
@@ -99,7 +99,8 @@ int main ( int argc, char** argv )
 
     //==================== recognize text from input images =========================
     // const std::string boost_ER1Phase = "conf/boostGeom.conf";
-    std::string boost_ER1Phase = "boost_er1stage.conf";
+    // std::string boost_ER1Phase = "boost_er1stage.conf";
+    std::string boost_ER1Phase = "boost_er1stage_handpicked.xml";
     // const std::string svm_ER2Phase = "conf/svmERGeom.conf";
     // std::string svm_ER2Phase = "svm_er2stage.conf";
     const std::string svm_merge = "conf/svmMerge.conf";
@@ -121,6 +122,7 @@ int main ( int argc, char** argv )
                     dictionary );
             recorder->makeRecord( file_path, words ); 
         }
+
         recorder->save( *oss ); 
     }
     catch ( std::exception &exp )

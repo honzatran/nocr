@@ -147,7 +147,6 @@ std::vector<TranslatedWord> recognizeWords( Segment<T> &segmentation,
         const Dictionary &dictionary, 
         const cv::Mat &image )
 {
-
     auto letters = segmentation.segment( image );
 
     WordGenerator generator;
@@ -155,7 +154,7 @@ std::vector<TranslatedWord> recognizeWords( Segment<T> &segmentation,
     generator.initHorizontalDetection( letters, equiv );
     vector<TranslatedWord> words = generator.process( dictionary ); 
 
-    auto remaining_letters = generator.getRemainingLetters();
+    // auto remaining_letters = generator.getRemainingLetters();
     
     // generator.initVerticalDetection( remaining_letters, equiv );
     // auto vertical_words = generator.process( dictionary );

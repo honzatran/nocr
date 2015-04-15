@@ -63,7 +63,8 @@ class ComponentTreeBuilder
             {
                 NodeType *top = stack_.top();
                 stack_.pop();
-                delete top;
+                // delete top;
+                extraction_->destroyNode(top);
             }
         }
 
@@ -85,7 +86,8 @@ class ComponentTreeBuilder
             // initialization
             cv::Mat domain_bitmap = extraction_->getDomain();
             int init_pixel;
-            ComponentTreePolicy<E>::init( domain_bitmap, accessible_pixels_, stack_, &init_pixel );
+            ComponentTreePolicy<E>::init( domain_bitmap, accessible_pixels_, &init_pixel );
+            stack_.push( extraction_->createRootNode());
             const uchar* image_data = domain_bitmap.data;
             cols_ = domain_bitmap.cols; 
             rows_ = domain_bitmap.rows;
@@ -281,10 +283,10 @@ class ComponentTreeBuilder
             boundary_pixels_.pop();
         }
 
-        void pushRegion( int level, int pixel_code )
+        void pushRegion( int level, int pixel_code)
         {
             cv::Point pixel = getPoint(pixel_code);
-            NodeType* node = ComponentTreePolicy<E>::createNode( level, pixel );
+            NodeType* node = extraction_->createNode(pixel, level);
             stack_.push( node );
         }
 

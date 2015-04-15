@@ -30,7 +30,7 @@ void TextRecognition::loadConfiguration( // const std::string &dictionary_file,
 
     segmentation_.loadMethod( er_text_detection_.get() );
 
-    word_equivalence_.loadConfiguration( merge_conf_file );
+    word_equivalence_.loadConfiguration( merge_conf_file);
 }
 
 std::vector<TranslatedWord> TextRecognition::recognize( 
@@ -54,12 +54,12 @@ std::vector<TranslatedWord> TextRecognition::recognize(
     generator.initHorizontalDetection( letters, word_equivalence_ );
     vector<TranslatedWord> words = generator.process( dictionary ); 
 
-    auto remaining_letters = generator.getRemainingLetters();
-    
-    generator.initVerticalDetection(remaining_letters, word_equivalence_ );
-    auto vertical_words = generator.process( dictionary );
-
-    words.insert( words.end(), vertical_words.begin(), vertical_words.end() );
+    // auto remaining_letters = generator.getRemainingLetters();
+    //
+    // generator.initVerticalDetection(remaining_letters, word_equivalence_ );
+    // auto vertical_words = generator.process( dictionary );
+    //
+    // words.insert( words.end(), vertical_words.begin(), vertical_words.end() );
 
     if ( show_words_ )
     {
@@ -96,7 +96,16 @@ void TextRecognition::showLetters( const std::vector<Letter> &letters, const cv:
     {
         drawer->draw(l);
     }
-    gui::showImage( drawer->getImage(), "detected letters" );
+
+    std::unique_ptr<DrawerInterface> rect_drawer( new RectangleDrawer() );
+    rect_drawer->init(drawer->getImage());
+
+    for ( const auto &l : letters )
+    {
+        rect_drawer->draw(l);
+    }
+
+    gui::showImage( rect_drawer->getImage(), "detected letters" );
 }
 
 void TextRecognition::showWords( const std::vector<TranslatedWord> &words, const cv::Mat &image )

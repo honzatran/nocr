@@ -20,6 +20,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <limits>
 
 /**
  * @brief enum for component extraction in image 
@@ -90,7 +91,6 @@ class TrainExtractionPolicy<extraction::BWMaxComponent>
 template < feature F, extraction E = extraction::BlackAndWhite >
 struct TrainDataCreator
 {
-    static const int k_min_size = 70;
     std::unique_ptr<AbstractFeatureExtractor> feature_;
 
 
@@ -123,16 +123,37 @@ struct TrainDataCreator
     void loadAndProcessSamples( const std::string &list_training_samples, const std::string &output )
     {
         loader ld;
-        std::vector<fileInfo> fileList = ld.getFileList( list_training_samples ); 
         std::ofstream ofs(output);
-        OutputWriter out( &ofs );
-
-        for ( const auto &info: fileList )
+        std::ifstream ifs(list_training_samples);
+        
+        if (!ofs.is_open())
         {
-            cv::Mat image = cv::imread( info.getPathToFile(), CV_LOAD_IMAGE_GRAYSCALE );
+            // throw exception
+        }
+
+        if (!ifs.is_open()) 
+        {
+            //throw exception
+        }
+
+
+        ofs.precision(std::numeric_limits<float>::digits10);
+
+        std::string buffer;
+
+        while (std::getline(ifs, buffer))
+        {
+            std::string file_path;
+            int label;
+
+            std::size_t pos = buffer.find_last_of(':');
+            file_path = buffer.substr(0, pos);
+            label = std::stoi(buffer.substr(pos + 1));
+
+            cv::Mat image = cv::imread( file_path, CV_LOAD_IMAGE_GRAYSCALE );
             if ( image.empty() )
             {
-                std::cout << info.getPathToFile() << std::endl;
+                // std::cout << info.getPathToFile() << std::endl;
                 // TODO
                 // throw exception
                 continue;
@@ -141,13 +162,18 @@ struct TrainDataCreator
             auto comps = TrainExtractionPolicy<E>::extract(image);
             for( auto &c : comps )
             {
-                if ( c.size() > k_min_size ) 
+                std::vector<float> sample = feature_->compute( c );
+                for (std::size_t i = 0; i < sample.size(); ++i)
                 {
-                    std::vector<float> sample = feature_->compute( c );
-                    out.write( sample, info.getLabel() );
+                    ofs << sample[i] << ' ';
                 }
+
+                ofs << label << std::endl;
             }
         }
+
+        ofs.close();
+        ifs.close();
     }
 };
 

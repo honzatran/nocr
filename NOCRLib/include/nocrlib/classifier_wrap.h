@@ -9,6 +9,8 @@
 #ifndef NOCRLIB_DESTREE_H 
 #define NOCRLIB_DESTREE_H 
 
+#define DEBUG 0
+
 #include "swt.h"
 #include "component.h"
 #include "drawer.h"
@@ -20,6 +22,8 @@
 #include <libsvm/svm.h>
 #include <liblinear/linear.h> 
 
+#include <pugi/pugixml.hpp>
+
 
 #include <iostream>
 #include <fstream>
@@ -28,6 +32,7 @@
 #include <map>
 #include <vector>
 #include <memory>
+#include <array>
 
 
 
@@ -202,6 +207,18 @@ class Boost
             return boost_.predict( sample, cv::Mat(), cv::Range::all(), false, sum_ );
         }
 
+        float predict (const std::vector<float> & sample) const 
+        {
+            cv::Mat tmp(1, sample.size(), CV_32FC1);
+
+            for (std::size_t i = 0; i < sample.size(); ++i)
+            {
+                tmp.at<float>(0, i) = sample[i];
+            }
+             
+            return boost_.predict( tmp, cv::Mat(), cv::Range::all(), false, sum_ );
+        }
+
         /**
          * @brief set flag to return sum or labeled function
          *
@@ -217,15 +234,79 @@ class Boost
 }; 
 
 /// @cond
+struct FeatureScaler;
+
 class LibSVMTrainBridge
 {
     public:
+        LibSVMTrainBridge() 
+            : problem_(nullptr)
+        {
+        }
+
+        ~LibSVMTrainBridge()
+        {
+            if (problem_)
+            {
+                delete[] problem_->y;
+                for ( int i = 0; i < problem_->l; ++i )
+                {
+                    delete[] problem_->x[i];
+                }
+                 
+                delete[] problem_->x;
+
+                delete problem_;
+            }
+        }
+
+        // kdyztak dopsat copy atd..
+        
         svm_model* train( const cv::Mat &train_data, const cv::Mat &labels, svm_parameter *param );
         svm_node* constructSample( const std::vector<float> &output ) const;
 
+        void constructSample( const std::vector<float> &output, svm_node * nodes ) const;
+
+        void save(const std::string & file_name, const svm_model * model);
+        void save(const std::string & file_name, const svm_model * model, 
+                const std::vector<FeatureScaler> & scalers);
+
+        svm_model * load(const std::string & file_name);
+        svm_model * load(const std::string & file_name, std::vector<FeatureScaler> & scalers);
+
+        void destroy_svm_model(svm_model ** model);
     private:
-        svm_problem constructProblem( const cv::Mat &train_data, const cv::Mat &labels ) const;
-        
+        void constructProblem( const cv::Mat &train_data, const cv::Mat &labels );
+        void saveSvmModel(pugi::xml_node & svm_node, const svm_model * model);
+        svm_model * loadSvmModel(const pugi::xml_node & svm_node);
+
+        template <typename T> 
+        std::string format(const T * ptr, std::size_t length, char delim = ' ')
+        {
+            std::stringstream ss;
+            for (std::size_t i = 0; i < length - 1; ++i)
+            {
+                ss << ptr[i] << delim;
+            }
+            ss << ptr[length - 1];
+
+            return ss.str();
+        }
+
+        template <typename T>
+        void parse(T ** ptr, std::size_t length, const char * data)
+        {
+            std::stringstream ss(data);
+            T * tmp = new T[length];
+            for (int i = 0; i < length; ++i)
+            {
+                ss >> tmp[i];
+            }
+
+            *ptr = tmp;
+        }
+
+        svm_problem * problem_;
 };
 /// @endcond
 
@@ -321,13 +402,12 @@ class LibSVM
          *
          * @return label of predicted class
          */
-        float predict(const std::vector<float> &data ) const
+        float predict(const std::vector<float> &data ) 
         {
             NOCR_ASSERT( svm_ != nullptr , "no configuration loaded yet" );
 
-            svm_node *nodes = bridge_.constructSample( data );
-            float out = svm_predict( svm_ , nodes );
-            delete[] nodes;
+            bridge_.constructSample( data, &nodes_[0]);
+            float out = svm_predict( svm_ , &nodes_[0]);
             return out;
         }
 
@@ -343,16 +423,14 @@ class LibSVM
          * If SVM isn't trained for probability outputs, exception will be thrown.
          */
         double predictProbabilities(const std::vector<float> &data, 
-                                    std::vector<double> &probabilities ) const  
+                                    std::vector<double> &probabilities ) 
         {
             NOCR_ASSERT( svm_ != nullptr , "no configuration loaded yet" );
 
-
-            svm_node *nodes = bridge_.constructSample( data );
-            probabilities.resize( number_of_classes_ );
-            double out = svm_predict_probability( svm_ , nodes, 
+            bridge_.constructSample( data, &nodes_[0] );
+            probabilities.resize( number_of_classes_);
+            double out = svm_predict_probability( svm_ , &nodes_[0], 
                                                 probabilities.data() ); 
-            delete[] nodes;
             return out;
         }
 
@@ -360,6 +438,7 @@ class LibSVM
         LibSVMTrainBridge bridge_;
         svm_model *svm_;
         int number_of_classes_;
+        std::array<svm_node, FeatureTraits<F>::features_length + 1> nodes_;
 };
 
 // /**
@@ -501,6 +580,7 @@ class LibLINEAR
         {
             cv::Mat train_data, labels;
             LoadTrainData<F>::load( data_file, train_data, labels );
+            
             model_ = bridge_.trainModel( train_data, labels, param );
             number_of_classes_ = get_nr_class( model_ );
         }
@@ -588,6 +668,11 @@ class LibLINEAR
  */
 struct FeatureScaler
 {
+    FeatureScaler() 
+        : min_(0), interval_length_(1), scaled_min_(0), scaled_interval_length_(1)
+    {
+    }
+    
     FeatureScaler( float min, float max, float scaled_min = -1, float scaled_max = 1 );
     float min_, interval_length_;
     float scaled_min_, scaled_interval_length_;
@@ -602,13 +687,19 @@ class DataScaling
         DataScaling( const std::vector<FeatureScaler> &scalers )
             : scalers_(scalers) { }
 
-
         std::vector<float> scale( const std::vector<float> &descriptor ) const;
 
         void setUp( const cv::Mat &train_data );
 
         void saveScaling( const std::string &scale_file );
         void loadScaling( const std::string &scale_file );
+
+        std::vector<FeatureScaler> getScalers() const { return scalers_; }
+
+        void setScalers(const std::vector<FeatureScaler> & scalers)
+        {
+            scalers_ = scalers;
+        }
     private:
         std::vector<FeatureScaler> scalers_;
 };
@@ -635,7 +726,15 @@ class ScalingLibSVM
         {
             if ( svm_ != nullptr )
             {
-                svm_free_and_destroy_model(&svm_);
+                if (svm_->free_sv != 1)
+                {
+                    svm_free_and_destroy_model(&svm_);
+                }
+                else
+                {
+                    bridge_.destroy_svm_model(&svm_);
+                }
+                svm_ = nullptr;
             }
         }
 
@@ -673,15 +772,14 @@ class ScalingLibSVM
          *
          * @param conf_file path to the configuration
          */
-        void saveConfiguration( const std::string &conf_file, const std::string &scale_file )
+        void saveConfiguration( const std::string &conf_file)
         {
-            int result = svm_save_model( conf_file.c_str(), svm_ );
-            if (result != 0)
-            {
-                throw ActionError( "saving to " + conf_file );
-            }
-
-            data_scaling_.saveScaling(scale_file);
+            bridge_.save(conf_file, svm_, data_scaling_.getScalers());
+            // int result = svm_save_model( conf_file.c_str(), svm_ );
+            // if (result != 0)
+            // {
+            //     throw ActionError( "saving to " + conf_file );
+            // }
         }
 
         /**
@@ -690,16 +788,20 @@ class ScalingLibSVM
          * @param conf_file path to the configuration
          * @throw FileNotFoundException when file \p conf_file doesn't exist
          */
-        void loadConfiguration( const std::string &conf_file, const std::string &scale_file )
+        void loadConfiguration( const std::string &conf_file)
         {
-            svm_ = svm_load_model( conf_file.c_str() );
-            //TODO
-            if ( svm_ == nullptr )
-            {
-                throw FileNotFoundException(conf_file + ", libsvm configuration not found");
-            }
+            // svm_ = svm_load_model( conf_file.c_str() );
+            // //TODO
+            // if ( svm_ == nullptr )
+            // {
+            //     throw FileNotFoundException(conf_file + ", libsvm configuration not found");
+            // }
+            //
+            auto scalers = data_scaling_.getScalers();
+            svm_ = bridge_.load(conf_file, scalers);
+            data_scaling_.setScalers(scalers);
             number_of_classes_ = svm_get_nr_class( svm_ );
-            data_scaling_.loadScaling(scale_file);
+            // data_scaling_.loadScaling(scale_file);
         }
 
 
@@ -710,7 +812,7 @@ class ScalingLibSVM
          *
          * @return label of predicted class
          */
-        float predict(const std::vector<float> &data ) const
+        float predict(const std::vector<float> &data ) 
         {
             NOCR_ASSERT( svm_ != nullptr , "no configuration loaded yet" );
 
@@ -735,18 +837,16 @@ class ScalingLibSVM
          * If SVM isn't trained for probability outputs, exception will be thrown.
          */
         double predictProbabilities(const std::vector<float> &data, 
-                                    std::vector<double> &probabilities ) const  
+                                    std::vector<double> &probabilities ) 
         {
             NOCR_ASSERT( svm_ != nullptr , "no configuration loaded yet" );
 
 
-            svm_node *nodes = 
-                    bridge_.constructSample( data_scaling_.scale(data) );
+            bridge_.constructSample( data_scaling_.scale(data), &nodes_[0]);
 
             probabilities.resize( number_of_classes_ );
-            double out = svm_predict_probability( svm_ , nodes, 
+            double out = svm_predict_probability( svm_ , &nodes_[0], 
                                                 probabilities.data() ); 
-            delete[] nodes;
             return out;
         }
 
@@ -755,6 +855,7 @@ class ScalingLibSVM
         svm_model *svm_;
         int number_of_classes_;
         DataScaling data_scaling_;
+        std::array<svm_node, FeatureTraits<F>::features_length + 1> nodes_;
 };
 
 #endif /* classifier_wrap.h */

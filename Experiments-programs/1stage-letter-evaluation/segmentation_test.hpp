@@ -42,7 +42,7 @@ public:
 
     void makeRecord( std::ostream &oss ) const;
 
-    void setImageName(const std::string & image_name);
+    void setImageName(const std::string & image_name, const cv::Mat & image);
 
     void virtual operator() (const ERRegion & err);
 
@@ -53,16 +53,25 @@ public:
             && true_positives_ == other.true_positives_;
     }
 
+    cv::Mat getCurrentImage()
+    {
+        return curr_img_;
+    }
+
+    void notifyResize(const std::string & name, double scale);
+
 protected:
     std::map<std::string, std::vector<cv::Rect> > ground_truth_;
 
     bool areMatching(const cv::Rect & c_rect, const cv::Rect & gt_rect);
+    void draw(const Component & c);
 
     unsigned int true_positives_;
     unsigned int number_results_;
     unsigned int number_ground_truth_;
 
     decltype(ground_truth_.begin()) curr_image_it_;
+    cv::Mat curr_img_;
 
     std::vector<bool> detected_;
 };
@@ -78,7 +87,10 @@ private:
     std::unique_ptr<AbstractFeatureExtractor> extractor_;
     std::ofstream ofs_;
 
-    LibSVM<feature::ERGeom1> svm_;
+    void drawError(const Component & c);
+
+    ScalingLibSVM<feature::ERGeom1> svm_;
+    Boost<feature::ERGeom1> boost_;
 };
 
 

@@ -22,6 +22,10 @@
 
 #include <opencv2/core/core.hpp>
 
+#include <boost/pool/pool.hpp>
+#include <boost/pool/object_pool.hpp>
+#include <boost/pool/pool_alloc.hpp>
+
 #include <vector>
 #include <memory>
 
@@ -179,10 +183,17 @@ class ERFilter2Stage
          */
         bool isLetter( ERRegion &r );
 
+        void operator() (ERRegion & err);
+
+        std::vector<LetterStorage<ERStat> > getLetters() const;
+
+        void clearLetters();
     private:
-        std::unique_ptr< AbstractFeatureExtractor > features_extractor_;
-        LibSVM<feature::ERGeom1> svm_;
-        // ScalingLibSVM<feature::ERGeom1> svm_;
+        std::unique_ptr<AbstractFeatureExtractor> features_extractor_;
+        // LibSVM<feature::ERGeom1> svm_;
+        std::vector<LetterStorage<ERStat> > storages_;
+
+        ScalingLibSVM<feature::ERGeom1> svm_;
 };
 
 // ==================================Extremal region=========================
@@ -203,7 +214,10 @@ class ERTree
          * area to 1, which will result in all nodes being marked 
          * as letter candidates.
          */
-        ERTree() : root_(nullptr), min_area_ratio_(0), max_area_ratio_(1) { }
+        ERTree() 
+            : root_(nullptr), min_area_ratio_(0), max_area_ratio_(1) 
+        { 
+        }
 
         /**
          * @brief constructor 
@@ -429,6 +443,11 @@ class ERTree
 
         // class methods
         ComponentTreeNode<ERRegion> * root_;
+        boost::fast_pool_allocator<
+            NodeType, 
+            boost::default_user_allocator_new_delete, 
+            boost::details::pool::null_mutex,
+            32> memory_pool_allocator_;
         
         int cols_, rows_;
         cv::Mat bitmap_;
@@ -446,7 +465,7 @@ class ERTree
         float min_delta_ = 0.1f;
 
         double min_area_ratio_, max_area_ratio_;
-        const int min_area_limit = 45;
+        const int min_area_limit = 20;
         int min_area_, max_area_;
 
         int delta_ = 5;
@@ -474,6 +493,14 @@ class ERTree
          */
         void merge( NodeType *child, NodeType *parent );
 
+
+        NodeType * createNode(cv::Point pixel, int level);
+
+        NodeType * createRootNode();
+
+        void destroyNode(NodeType * node);
+
+
         // private methods of class
         cv::Point getPoint( int code )
         {
@@ -489,20 +516,50 @@ class ERTree
         // void computeHoleArea( Region * node, int surrounding_area );
 
         void saveTree( NodeType *root, std::vector<NodeType*> &nodes ) const;
+        
 
-        template <typename Functor> 
-        bool transformTree( NodeType *root, const Functor &fn )
+        // template <typename Functor> 
+        // bool transformTree( NodeType *root, Functor &&fn )
+        // {
+        //     bool result = fn( root );
+        //     NodeType *child = root->child_;
+        //     while( child != nullptr )
+        //     {
+        //         NodeType *tmp = child->next_;
+        //         if ( !transformTree( child, fn ) )
+        //         {
+        //             child->remove();
+        //             delete child;
+        //         }
+        //         child = tmp;
+        //     }
+        //
+        //     return result;
+        // }
+        
+        template <typename Functor>
+        bool transform(Functor && functor, NodeType * root)
         {
-            bool result = fn( root );
-            NodeType *child = root->child_;
+            bool result = functor(root);
+            root->size_ = 1;
+             
+            NodeType * child = root->child_;
             while( child != nullptr )
             {
-                NodeType *tmp = child->next_;
-                if ( !transformTree( child, fn ) )
+                NodeType * tmp = child->next_;
+                if ( !transform(functor, child) )
                 {
+                    root->size_ += child->size_;
                     child->remove();
-                    delete child;
+                    // memory_pool_.destroy(child);
+                    memory_pool_allocator_.destroy(child);
+                    memory_pool_allocator_.deallocate(child);
                 }
+                else
+                {
+                    root->size_ += child->size_;
+                }
+
                 child = tmp;
             }
 
@@ -528,11 +585,10 @@ template <> class ComponentTreePolicy<ERTree>
         typedef ComponentTreeNode<ERRegion> NodeType;
     
         static void init( const cv::Mat &bitmap, std::vector<bool> &accesible_mask, 
-                std::stack<NodeType*> &stack, int * init_pixel_code )
+                int * init_pixel_code )
         {
             accesible_mask = helper::getAccesibilityMaskWithNegativeBorder( bitmap );
-            NodeType r(256);
-            stack.push( new NodeType(r) );
+            // stack.push( new NodeType(256) );
             *init_pixel_code = bitmap.cols + 1;
             accesible_mask[*init_pixel_code] = true;
         }
@@ -627,12 +683,6 @@ struct LetterMergingFactory : public AbstractFeatureFactory
     cv::Mat image_;
 };
 
-template <>
-struct FeatureTraits<feature::MergeLetter>
-{
-    static const int features_length = 10;
-    typedef LetterMergingFactory FactoryType;
-};
 /// @cond
 //
 template <>
@@ -730,5 +780,12 @@ public:
 private:
     std::vector<Component> extracted_components_;
 };
+
+class ErLimitSize
+{
+public:
+    static std::pair<double, double> getErSizeLimits(const cv::Size & size);
+};
+
 
 #endif /* extremal_region.h */

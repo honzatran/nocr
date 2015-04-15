@@ -9,12 +9,16 @@
 #ifndef NOCRLIB_IKSVM_H
 #define NOCRLIB_IKSVM_H
 
+#define DECISION_FUNC 1
+
 #include <libsvm/svm.h>
 
 #include <vector>
 #include <string>
 #include <ostream>
 #include <thread>
+
+#include <pugi/pugixml.hpp>
 
 #include "assert.h"
 
@@ -25,8 +29,14 @@ class ApproximatedFunction
     public:
         ApproximatedFunction( double min_sample, double step_size,
                 const std::vector<double> & function_values );
-double getValueAt(double d);
+
+        double getValueAt(double d);
         friend std::ostream& operator<< ( std::ostream &oss, const ApproximatedFunction &fnc );
+
+        double getMinSample() const { return min_sample_; }
+        double getStepSize() const { return step_size_; }
+        std::vector<double> getFunctionValues() const { return function_values_; } 
+
     private:
         int num_steps_;
         double min_sample_;
@@ -51,15 +61,22 @@ class DecisionFunction
         double compute( const std::vector<double> &x );
         
         void loadFromString( const std::string &s, int features_dim );
-        ApproximatedFunction strToApproxFunction(const std::string &s);
+
+        void strToApproxFunction(const std::string &s);
 
         friend std::ostream& operator<<( std::ostream &oss, const DecisionFunction &fnc );
     private:
-        // functions h_i 
-        std::vector<ApproximatedFunction> approximated_functions_;
-        // b
+        std::size_t fuction_approx_count_;
+        std::size_t feature_dim_;
         double b_;
+         
+        std::vector<double> function_values_;
+        std::vector< std::pair<double, double> > step_size_;
+
+        friend class IKSVM;
 };
+
+
 /// @endcond
 
 class IKSVM;
@@ -154,6 +171,9 @@ class IKSVM
          */
         void save( const std::string &file );
 
+        void saveXml(const std::string & file);
+        
+
         /**
          * @brief loads iksvm configuration from file
          *
@@ -179,31 +199,41 @@ class IKSVM
          */
         std::pair<double, std::vector<double> > predictProbability( const std::vector<double> &x );
     private:
-        IKSVM( int nr_class, int features_dim,
+        IKSVM( int nr_class, int features_dim, int approx_count,
                const std::vector<double> prob_A, const std::vector<double> prob_B,
                const std::vector<DecisionFunction> desicion_functions, 
                const std::vector<double> labels ); 
 
         int nr_class_;
         int features_dim_; 
+        int approx_count_;
         std::vector<double> prob_A_;
         std::vector<double> prob_B_;
-        std::vector<DecisionFunction> desicion_functions_;
-        std::vector<double> labels_;
+        // std::vector<DecisionFunction> desicion_functions_;
 
+        std::vector<double> decision_function_;
+        std::vector<double> decision_values_b_;
+        std::vector<std::pair<double, double> > decision_function_info_;
+
+        std::vector<double> labels_;
 
         bool startsWith( const std::string &s, const std::string &start);
         std::string parse( const std::string &start, const std::string &line );
+        void parseDecisionFunction(const std::string &line, std::size_t indx);
         std::vector<double> strToVec( const std::string &start );
+
+        void saveXmlDF(pugi::xml_node & df_node, const DecisionFunction & fn);
 
         double computeDecisionsValue( const std::vector<double> &x, 
                 std::vector<double> &decision_values );
 
+        double evalDecisionFunction(std::size_t indx, const std::vector<double> & x); 
 
 
 
         const static std::string number_class_text;
         const static std::string feature_dimension_text;
+        const static std::string approx_count;
         const static std::string probA_text;
         const static std::string probB_text;
         const static std::string label_text;

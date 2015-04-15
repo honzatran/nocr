@@ -345,6 +345,17 @@ class ERRegion
                 return q2_count + k_c * ( q1_count + 2 * q2d_count + q3_count );
             }
 
+            int getBitCount(std::uint16_t k)
+            {
+                int c = 0;
+                for (; k; ++c)
+                {
+                    k &= k - 1;
+                }
+                
+                return c;
+            }
+
             void merge( const EulerQuadRecordBit &a )
             {
                 q1_count += a.q1_count;

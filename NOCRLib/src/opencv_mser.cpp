@@ -18,8 +18,8 @@ void CvMSERDetection::loadConfiguration( const std::string &config_file )
         svm_ = std::make_shared< ScalingLibSVM<feature::ERGeom1> >();
     }
 
-    svm_->loadConfiguration( config_file, "scaling_er2stage.conf" );
-    // svm_->loadConfiguration( config_file );
+    // svm_->loadConfiguration( config_file, "scaling_er2stage.conf" );
+    svm_->loadConfiguration( config_file );
 }
 
 

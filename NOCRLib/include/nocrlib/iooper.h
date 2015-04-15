@@ -21,21 +21,21 @@
 #include <opencv2/core/core.hpp>
 
 /// @cond
-class fileInfo
-{
-    public:
-        fileInfo( const std::string &pathToFile, const std::string &strLabelOfFile )
-            : pathToFile_(pathToFile)
-        {
-            label_ = std::stof( strLabelOfFile );
-        }
-
-        std::string getPathToFile() const { return pathToFile_; }
-        float getLabel() const { return label_; }
-    private:
-        std::string pathToFile_;
-        float label_;
-};
+// class fileInfo
+// {
+//     public:
+//         fileInfo( const std::string &pathToFile, const std::string &strLabelOfFile )
+//             : pathToFile_(pathToFile)
+//         {
+//             label_ = std::stof( strLabelOfFile );
+//         }
+//
+//         std::string getPathToFile() const { return pathToFile_; }
+//         float getLabel() const { return label_; }
+//     private:
+//         std::string pathToFile_;
+//         float label_;
+// };
 
 class loader
 {
@@ -51,8 +51,8 @@ class loader
         typedef std::vector< std::vector<float> > floatVecVec;
         floatVecVec loadDataToFloatMatrix(const std::string &textFile);
    
-        typedef std::vector< fileInfo > fileInfoVec;
-        fileInfoVec getFileList(const std::string &textFile);
+        // typedef std::vector< fileInfo > fileInfoVec;
+        // fileInfoVec getFileList(const std::string &textFile);
         std::vector<std::string> getFileContent( const std::string &file );
     private:
         char delim_;

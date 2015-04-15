@@ -15,6 +15,7 @@
 #include "utilities.h"
 #include "structures.h"
 #include "features.h"
+#include "extremal_region.h"
 
 #include <vector>
 #include <map>
@@ -29,7 +30,12 @@
 
 
 
-
+template <>
+struct FeatureTraits<feature::MergeLetter>
+{
+    static const int features_length = 10;
+    typedef LetterMergingFactory FactoryType;
+};
 
 
 /**
@@ -45,7 +51,10 @@ class LetterWordEquiv
         /**
          * @brief default constructor, doesn't initiaze anything
          */
-        LetterWordEquiv() = default;
+        LetterWordEquiv() 
+            : svm_(nullptr)
+        {
+        }
 
         /**
          * @brief constructor
@@ -54,12 +63,18 @@ class LetterWordEquiv
          */
         LetterWordEquiv( const std::string &train_configurator )
         {
-            svm_.loadConfiguration( train_configurator );
+            svm_ = create<LibSVM, feature::MergeLetter>();
+            svm_->loadConfiguration( train_configurator );
         }
 
         void loadConfiguration( const std::string &train_configurator )
         {
-            svm_.loadConfiguration( train_configurator );
+            if (svm_ == nullptr)
+            {
+                svm_ = create<LibSVM, feature::MergeLetter>();
+            }
+
+            svm_->loadConfiguration( train_configurator );
         }
 
         /**
@@ -74,7 +89,7 @@ class LetterWordEquiv
         {
             std::vector<float> tmp = getFeatures(a,b);
             cv::Mat features( tmp ); 
-            return svm_.predict(features) == 1;
+            return svm_->predict(features) == 1;
         }
 
         /**
@@ -89,7 +104,7 @@ class LetterWordEquiv
         {
             std::vector<double> tmp;
             std::vector<float> features = getFeatures( a,b );
-            svm_.predictProbabilities( features, tmp );
+            svm_->predictProbabilities( features, tmp );
             return tmp[1];
         }
 
@@ -139,7 +154,7 @@ class LetterWordEquiv
 
     private:
         // supportVectorMachine<feature::MergeLetter> svm_;
-        LibSVM<feature::MergeLetter> svm_;
+        std::shared_ptr< LibSVM<feature::MergeLetter> > svm_;
         // Boost<feature::MergeLetter> boosting_;
 
         static float getRatio( float a, float b )

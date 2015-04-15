@@ -14,18 +14,21 @@
 #include <nocrlib/testing.h>
 #include <nocrlib/iooper.h>
 #include <nocrlib/assert.h>
+#include <nocrlib/utilities.h>
 
 #include "segmentation_test.hpp"
 
+#include <boost/program_options.hpp>
+
+#define SIZE 1024
 
 using namespace std;
 
-string er1_conf_file = "../boost_er1stage.conf";
-string er2_conf_file = "../svm_er2stage.conf";
+string er1_conf_file = "../boost_er1stage_handpicked.xml";
+string er2_conf_file = "../scaled_svmEr2_1.xml";
 string icdar_gt_file = "";
-double min_area_ratio = 0.00007;
-double max_area_ratio = 0.3;
-
+double min_area_ratio = 0.000035;
+double max_area_ratio = 0.1;
 
 pair<string, string> parse(const string & line)
 {
@@ -40,32 +43,57 @@ pair<string, string> parse(const string & line)
 int main(int argc, char ** argv)
 {
     bool second_stage_filter = false;
-    if (argc == 4 || argc == 3)
+
+    string xml_file, test_file, dir;
+    
+    
+    namespace po = boost::program_options;
+    po::variables_map vm;
+    po::options_description desc("Usage");
+    desc.add_options()
+        ("help,h","display help message")
+        ("dir,d", po::value<string>(&dir),"output directory of extracted letters")
+        ("xml,x", po::value<string>(&xml_file), "icdar 2013 test set ground truth")
+        ("test,t", po::value<string>(&test_file), "file with test images")
+        ("2stage-filter", "run second stage filter")
+        ("boost-conf", po::value<string>(&er1_conf_file), "path to boost first stage classifier")
+        ("svm-conf", po::value<string>(&er2_conf_file), "path to svm second stage classifier");
+
+    Resizer resizer(SIZE);
+         
+    try 
     {
-        if (argc == 4)
-        {
-            string s = argv[3];
-            if (s != "--2stage-filter")
-            {
-                cerr << "argument error " << argv[0] << " [xml ground truth] [list of  test files] --2stage-filter" << endl;
-            }
-            else
-            {
-                second_stage_filter = true;
-            }
-        }
-    }
-    else
+        po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
+        po::store( parsed , vm ); 
+        po::notify(vm);
+    } 
+    catch ( po::error &e )
     {
-        cerr << "argument error " << argv[0] << " [xml ground truth] [list of  test files] --2stage-filter" << endl;
+        std::cerr << "Parsing cmd line error:" << std::endl;
+        std::cerr << e.what() << std::endl;
+
         return 1;
     }
+
+    if ( vm.count("help") || vm.count("xml") == 0 || vm.count("test") == 0)
+    {
+        std::cerr << "experiment filtering letters" << std::endl;
+        std::cerr << desc << std::endl;
+        return 1;
+    }
+
+    
+    if (vm.count("2stage-filter") > 0)
+    {
+        second_stage_filter = true;
+    }
+
 
 
     ERTree er_tree(min_area_ratio, max_area_ratio);
     er_tree.setMinGlobalProbability(0.2);
     er_tree.setMinDifference(0.1);
-    er_tree.setDelta(1);
+    er_tree.setDelta(4);
 
     std::unique_ptr<ERFilter1Stage> er_function( new ERFilter1Stage() );
     er_function->loadConfiguration(er1_conf_file);
@@ -85,10 +113,11 @@ int main(int argc, char ** argv)
         letter_test = std::unique_ptr<LetterSegmentTesting>(new LetterSegmentTesting());
     }
 
-    letter_test->loadGroundTruthXML(argv[1]);
+    letter_test->loadGroundTruthXML(xml_file);
 
     loader input;
-    vector<string> lines = input.getFileContent(argv[2]);
+    vector<string> lines = input.getFileContent(test_file);
+    ImageSaver saver;
 
     for (const string & line : lines)
     {
@@ -96,12 +125,24 @@ int main(int argc, char ** argv)
         std::tie(file_path, gt_file_name) = parse(line);
 
         cv::Mat image = cv::imread(file_path, CV_LOAD_IMAGE_GRAYSCALE);
+
+        if ( image.rows < SIZE && image.cols < SIZE )
+        {
+            image = resizer.resizeKeepAspectRatio(image);
+            letter_test->notifyResize(gt_file_name, resizer.getLastScale());
+        }
+
+        std::tie(min_area_ratio, max_area_ratio) =
+            ErLimitSize::getErSizeLimits(image.size());
+
+        er_tree.setMinAreaRatio(min_area_ratio);
+        er_tree.setMaxAreaRatio(max_area_ratio);
         er_tree.setImage(image);
-        letter_test->setImageName(gt_file_name);
+
+        letter_test->setImageName(gt_file_name, image);
 
         builder.buildTree();
         er_tree.transformExtreme();
-        er_tree.rejectSimilar();
         er_tree.processTree(*letter_test);
         er_tree.deallocateTree();
 
@@ -109,9 +150,14 @@ int main(int argc, char ** argv)
 
         builder.buildTree();
         er_tree.transformExtreme();
-        er_tree.rejectSimilar();
         er_tree.processTree(*letter_test);
         er_tree.deallocateTree();
+
+        if (!dir.empty())
+        {
+            cv::Mat img = letter_test->getCurrentImage();
+            saver.saveImage(dir + "/" + getFileName(file_path), img);
+        }
     }
 
     letter_test->makeRecord(std::cout);

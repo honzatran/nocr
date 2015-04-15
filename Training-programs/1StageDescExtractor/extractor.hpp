@@ -43,7 +43,9 @@ public:
 
     void setFileImage(const std::string & file_name);
 
+    void notifyResize(double scale);
 private:
+        
     struct LetterRecord
     {
         cv::Vec3b color;

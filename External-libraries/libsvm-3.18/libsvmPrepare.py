@@ -9,7 +9,7 @@ def parseFile( file_name ):
         parseLine(line.rstrip()) 
 
 def parseLine( line ):
-    l = line.split(":")
+    l = line.split(" ")
     length = len(l)
     output = l[-1]
     print(output),

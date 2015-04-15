@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include "svm.h"
+
 // #include "mex.h"
 
 int libsvm_version = LIBSVM_VERSION;
@@ -2748,6 +2749,12 @@ int svm_save_model(const char *model_file_name, const svm_model *model)
 			fprintf(fp, "%.16g ",sv_coef[j][i]);
 
 		const svm_node *p = SV[i];
+                /*
+                 * if (i == 262)
+                 * {
+                 *     std::cout << p->index << " " << p->value << std::endl;
+                 * }
+                 */
 
 		if(param.kernel_type == PRECOMPUTED)
 			fprintf(fp,"0:%d ",(int)(p->value));
@@ -3160,3 +3167,43 @@ void svm_set_print_string_function(void (*print_func)(const char *))
 	else
 		svm_print_string = print_func;
 }
+
+// Tran Tuan Hiep
+
+const char * svm_get_type(int i)
+{
+    return svm_type_table[i];
+}
+
+const char * svm_get_kernel_type(int i)
+{
+    return kernel_type_table[i];
+}
+
+int get_svm_type_indx(const char * type)
+{
+    for(int i = 0; svm_type_table[i]; ++i)
+    {
+        if(strcmp(svm_type_table[i], type)==0)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+int get_kernel_type_indx(const char * type)
+{
+    for(int i=0; kernel_type_table[i]; ++i)
+    {
+        if(strcmp(kernel_type_table[i],type)==0)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+

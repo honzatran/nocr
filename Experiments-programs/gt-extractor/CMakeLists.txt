@@ -1,4 +1,3 @@
-find_package( Boost COMPONENTS program_options REQUIRED )
 
 set (exec_name gt-extractor)
 

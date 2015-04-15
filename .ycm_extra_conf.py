@@ -55,6 +55,8 @@ flags = [
 './NOCRLib/include',
 '-I',
 '/usr/local/include/opencv2',
+'-I',
+'./External-libraries/pugixml/pugi/'
 ]
 
 

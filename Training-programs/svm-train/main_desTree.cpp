@@ -41,20 +41,18 @@ void trainSVM(svm_parameter * param, const std::string & input, const std::strin
     {
         ScalingLibSVM<F> scaling_svm;
         scaling_svm.train(input, param);
-        scaling_svm.saveConfiguration(output, scaling);
+        scaling_svm.saveConfiguration(output);
     }
 }
 
 int main( int argc, char** argv )
 {
-
     std::string input, output;
 
     const std::string er_geom = "ergeom";
     const std::string er_geom1 = "ergeom-1";
     const std::string swt = "swt";
     const std::string hog = "hogOcr";
-
 
     svm_parameter param;
     param.svm_type = C_SVC;

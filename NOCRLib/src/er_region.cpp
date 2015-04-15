@@ -13,6 +13,8 @@
 
 #include <opencv2/core/core.hpp>
 
+#define _DEBUG 1
+
 
 using namespace std;
 using namespace cv;
@@ -92,6 +94,114 @@ void ERRegion::EulerQuadRecord::changeAtQuad(const int *indices, int elemToChang
 
 void ERRegion::EulerQuadRecordBit::update(std::uint16_t quads)
 {
+
+#if _DEBUG
+    std::uint16_t quad0 = quads & 0xF;
+    std::uint16_t quad1 = (quads & 0xF0) >> 4;
+    std::uint16_t quad2 = (quads & 0xF00) >> 8;
+    std::uint16_t quad3 = (quads & 0xF000) >> 12;
+
+    switch(getBitCount(quad0))
+    {
+        case 0:
+            ++q1_count;
+            break;
+        case 1:
+            --q1_count;
+            if (quad0 != 1)
+                ++q2_count;
+            else
+                ++q2d_count;
+            break;
+        case 2:
+            if(quad0 != 6)
+                --q2_count;
+            else
+                --q2d_count;
+
+            ++q3_count;
+            break;
+        default:
+            --q3_count;
+            break;
+    }
+
+    switch (getBitCount(quad1))
+    {
+        case 0:
+            ++q1_count;
+            break;
+        case 1:
+            --q1_count;
+            if (quad1 != 2)
+                ++q2_count;
+            else
+                ++q2d_count;
+            break;
+        case 2:
+            if(quad1 != 9)
+                --q2_count;
+            else
+                --q2d_count;
+
+            ++q3_count;
+            break;
+        default:
+            --q3_count;
+            break;
+    }
+    
+    switch(getBitCount(quad2))
+    {
+        case 0:
+            ++q1_count;
+            break;
+        case 1:
+            --q1_count;
+            if (quad2 != 4)
+                ++q2_count;
+            else
+                ++q2d_count;
+            break;
+        case 2:
+            if(quad2 != 9)
+                --q2_count;
+            else
+                --q2d_count;
+
+            ++q3_count;
+            break;
+        default:
+            --q3_count;
+            break;
+    }
+
+    switch(getBitCount(quad3))
+    {
+        case 0:
+            ++q1_count;
+            break;
+        case 1:
+            --q1_count;
+            if (quad3 != 8)
+                ++q2_count;
+            else
+                ++q2d_count;
+            break;
+        case 2:
+            if(quad3 != 6)
+                --q2_count;
+            else
+                --q2d_count;
+
+            ++q3_count;
+            break;
+        default:
+            --q3_count;
+            break;
+    }
+
+#else
     std::bitset<4> quad0 = quads & 0xF;
     switch(quad0.count())
     {
@@ -197,6 +307,7 @@ void ERRegion::EulerQuadRecordBit::update(std::uint16_t quads)
             --q3_count;
             break;
     }
+#endif
 }
 
 

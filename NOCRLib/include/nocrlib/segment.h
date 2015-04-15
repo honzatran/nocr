@@ -257,6 +257,10 @@ template <typename T> class Segment
                 }
             }
 
+#if PRINT_TIME
+            std::cout << "ocr max suppresion:" << translations.size() 
+                << "/" << output.size() << std::endl;
+#endif
             return output;
         }
 };

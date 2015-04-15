@@ -8,7 +8,6 @@
 #include "../include/nocrlib/assert.h"
 #include <opencv2/core/core.hpp>
 
-
 using namespace std;
 
 float ERFilter1Stage::getProbability( const ERRegion &r )
@@ -22,9 +21,9 @@ float ERFilter1Stage::getProbability( const ERRegion &r )
 
 bool ERFilter2Stage::isLetter( ERRegion &r )
 {
-    auto c_ptr = r.toCompPtr();
+    auto c = r.toComponent();
     vector<float> features = r.getFeatures();
-    vector<float> data = features_extractor_->compute( c_ptr );
+    vector<float> data = features_extractor_->compute(c);
     features.insert( features.end(), data.begin(), data.end() );
     /*
      * for( float f : features )
@@ -35,6 +34,30 @@ bool ERFilter2Stage::isLetter( ERRegion &r )
      */
     
     return svm_.predict( features ) == 1;
+}
+
+void ERFilter2Stage::operator() (ERRegion & err)
+{
+    auto c = err.toComponent();
+    vector<float> features = err.getFeatures();
+    vector<float> data = features_extractor_->compute( c);
+    features.insert( features.end(), data.begin(), data.end() );
+
+    if (svm_.predict(features) == 1)
+    {
+        storages_.push_back( LetterStorage<ERStat>( std::make_shared<Component>(
+                        std::move(c)), err.createERStat() ));
+    }
+}
+
+std::vector<LetterStorage<ERStat> > ERFilter2Stage::getLetters() const
+{
+    return storages_;
+}
+
+void ERFilter2Stage::clearLetters()
+{
+    storages_.clear();
 }
 
 // ==================================extremal region============================
@@ -217,8 +240,38 @@ void ERTree::merge( NodeType *child, NodeType *parent )
     }
 
     // child node isn't needed anymore 
-    delete child;
+    // delete child;
+    memory_pool_allocator_.destroy(child);
+    memory_pool_allocator_.deallocate(child);
+    // memory_pool_.destroy(child);
 }
+
+auto ERTree::createNode(cv::Point p, int level)
+    -> NodeType *
+{
+    ERRegion r( level, p );
+    NodeType * chunk = memory_pool_allocator_.allocate();
+    NodeType tmp(level, p);
+    memory_pool_allocator_.construct(chunk, tmp);
+    return chunk;
+}
+
+auto ERTree::createRootNode()
+    -> NodeType *
+{
+    NodeType * chunk = memory_pool_allocator_.allocate();
+    NodeType tmp(256);
+    memory_pool_allocator_.construct(chunk, tmp);
+    return chunk;
+}
+
+void ERTree::destroyNode(NodeType * node)
+{
+    // memory_pool_.destroy(node);
+    memory_pool_allocator_.destroy(node);
+    memory_pool_allocator_.deallocate(node);
+}
+
 
 void ERTree::setChildrensProbabilities( NodeType *parent, NodeType *child )
 {
@@ -320,37 +373,68 @@ void ERTree::breadthFirstSearchMinMax( NodeType *root, int maxDepth,
 
 vector< LetterStorage<ERStat> > ERTree::getLetters( bool deallocate )
 {
-    vector< LetterStorage<ERStat> > storages;
     transformExtreme(); 
+    
+#ifdef PRINT_INFO
+    std::cout << "first stage " << root_->getNodeCount() << endl;
+    std::cout << sizeof(cv::Vec4i) << std::endl;
+#endif
+     
+    transform([this] (NodeType * node) -> bool
+            {
+                return filter2_.isLetter(node->getVal());
+            }, root_);
+
+
+#ifdef PRINT_INFO
+    std::cout << "second stage " << root_->getNodeCount() << endl;
+#endif
+
+    /*
+     * transform([] (NodeType * node) -> bool
+     *         {
+     *             std::size_t parent_size = node->parent_->getVal().getSize();
+     *             std::size_t size = node->getVal().getSize();
+     *             std::size_t min_diff = std::max((std::size_t) (size * 0.002), (std::size_t) 10);
+
+     *             return (parent_size - size > min_diff);
+     *         }, root_);
+     */
+
     rejectSimilar();
+
+#ifdef PRINT_INFO
+    std::cout << "second stage after rejecting similar " << root_->getNodeCount() << endl;
+#endif
+
+
+    vector<LetterStorage<ERStat> > storages;
+
     vector<NodeType*> nodes;
     saveTree( root_, nodes );
 
-    for ( NodeType *node: nodes )
+    for (NodeType  * node : nodes)
     {
-        ERRegion reg = node->getVal();
-        if ( filter2_.isLetter(reg) )
-        {
-            auto comp_ptr = reg.toCompPtr();
-            // gui::showImage(comp_ptr->getBinaryMat(), "componenta");
-            storages.push_back( LetterStorage<ERStat>( comp_ptr, reg.createERStat() ) );
-        }
+        storages.push_back( LetterStorage<ERStat>(node->getVal().toCompPtr(), 
+                    node->getVal().createERStat() ));
     }
 
     if ( deallocate )
     {
-        for ( NodeType *node : nodes )
+        for ( NodeType * node : nodes )
         {
-            delete node;
+            // delete node;
+            memory_pool_allocator_.destroy(node);
+            memory_pool_allocator_.deallocate(node);
+            // memory_pool_.destroy(node);
         }
-        delete root_;
+        // delete root_;
+        // memory_pool_.destroy(root_);
+        memory_pool_allocator_.destroy(root_);
+        memory_pool_allocator_.deallocate(root_);
         root_ = nullptr;
     }
 
-#if PRINT_INFO
-    cout << "first stage filtered:" << nodes.size() << endl;
-    cout << "second stage filtered:" << storages.size() << endl;
-#endif
     return storages;
 }
 
@@ -361,9 +445,15 @@ void ERTree::deallocateTree()
     saveTree(root_, nodes);
     for ( NodeType *node: nodes )
     {
-        delete node;
+        // delete node;
+        memory_pool_allocator_.destroy(node);
+        memory_pool_allocator_.deallocate(node);
+        // memory_pool_.destroy(node);
     }
-    delete root_;
+    // delete root_;
+    memory_pool_allocator_.destroy(root_);
+    memory_pool_allocator_.deallocate(root_);
+    // memory_pool_.destroy(root_);
     root_ = nullptr;
 }
 
@@ -391,29 +481,32 @@ void ERTree::saveTree( NodeType *root, std::vector<NodeType*> &nodes ) const
 
 void ERTree::transformExtreme()
 {
-    transformTree( root_, [this] ( NodeType * node ) -> bool 
+    transform([this] (NodeType * node) -> bool
             {
                 return isExtremeRegion(node);
-            });
+            }, root_);
 }
 
 
 bool ERTree::isExtremeRegion( NodeType *node )
 {
-    if ( node->getVal().isLocalChildMaximum() ) 
-    {
+    /*
+     * if ( node->getVal().isLocalChildMaximum() ) 
+     * {
+     */
         auto extremeProb = findExtremeParentProb(node);
         // if nodeion is local maximum
         float childMaxProb = node->getVal().getProbability();
-        if ( extremeProb.second <= childMaxProb ) 
+        if (extremeProb.second <= childMaxProb) 
         {
             auto child_min = node->getVal().getChildMinProbability();
-            float local_min = std::min( extremeProb.first, child_min.probability_ );
+            // float local_min = std::min( extremeProb.first, child_min.probability_ );
+            float local_min = extremeProb.first;
             float val = childMaxProb - local_min;
-            // return ( val >= min_delta || val == 0 );
-            return ( val >= min_delta_ );
+            return ( val >= min_delta_ || val == 0 );
+            // return ( val >= min_delta_ );
         }
-    }
+    // }
     return false;
 }
 
@@ -437,8 +530,11 @@ pair<float,float> ERTree::findExtremeParentProb(NodeType *child_node)
         {
             output.second = prob;
         }
-        counter += node->depth_from_parent_;
+         
+        // counter += node->depth_from_parent_;
+        counter += 1;
     }
+
     return output;
 }
 
@@ -457,10 +553,20 @@ vector<Component> ERTree::toComponent()
 
 void ERTree::rejectSimilar()
 {
-    transformTree( root_, [this] (NodeType * node) 
+    transform([] (NodeType * node) -> bool
             {
-                return testSimilarParent(node);
-            });
+                if (!node->parent_)
+                {
+                    return true;
+                }
+
+                std::size_t parent_size = node->parent_->getVal().getSize();
+                std::size_t size = node->getVal().getSize();
+                std::size_t min_diff = std::max((std::size_t) (size * 0.002), (std::size_t) 10);
+
+                return (parent_size - size > min_diff);
+            }, root_);
+
 }
 
 bool ERTree::testSimilarChildren( NodeType *node )
@@ -547,12 +653,14 @@ ERTextDetection::ERTextDetection
     // ocr_( std::move(ocr) )
 {
     // knn_ocr_.loadTrainData( "distHistogramTrain" );
-    const double min_area_ratio = 0.00007;
-    const double max_area_ratio = 0.3;
+    double min_area_ratio = 0.00003;
+    double max_area_ratio = 0.1;
+
+   
     extremal_region_.setMinAreaRatio(min_area_ratio);
     extremal_region_.setMaxAreaRatio(max_area_ratio);
     extremal_region_.loadSecondStageConf( second_stage_conf );
-    extremal_region_.setDelta(5);
+    extremal_region_.setDelta(2);
 
     std::unique_ptr<ERFilter1Stage> er_function( new ERFilter1Stage() );
     er_function->loadConfiguration( first_stage_conf );
@@ -563,21 +671,13 @@ ERTextDetection::ERTextDetection
 auto ERTextDetection::getLetters( const cv::Mat &image ) 
     -> vector<Storage>
 {
+    double min_area_ratio;
+    double max_area_ratio;
+
+    std::tie(min_area_ratio, max_area_ratio) = ErLimitSize::getErSizeLimits(image.size());
+    extremal_region_.setMinAreaRatio(min_area_ratio);
+    extremal_region_.setMaxAreaRatio(max_area_ratio);
     extremal_region_.setImage( image );
-
-    /*
-     * int size_image = image.rows * image.cols;
-
-     * if ( size_image <= )
-     * {
-     * } 
-     * else if (size_image <= )
-     * {
-     * } 
-     * else
-     * {
-     * }
-     */
 
     ComponentTreeBuilder<ERTree> builder( &extremal_region_ );
     // ComponentTreeNode<ERRegion> *root = builder.buildTree();
@@ -603,4 +703,37 @@ std::vector<Component> ComponentExtractor::getExtractedComponents() const
     return extracted_components_;
 }
 
+std::pair<double, double> ErLimitSize::getErSizeLimits(const cv::Size & size)
+{
+    double min_area_ratio = 0.000035;
+    double max_area_ratio = 0.1;
+    if (size.area() <= 640 * 480)
+    {
+        min_area_ratio = 0.00005;
+        max_area_ratio = 0.4;
+    }
+    else if (size.area() <= 1024* 768)
+    {
+        min_area_ratio = 0.000035;
+        max_area_ratio = 0.3;
+    }
+    else if (size.area() <= 1280 * 1024)
+    {
+        min_area_ratio = 0.00003;
+        max_area_ratio = 0.1;
+    }
+    else if (size.area() <= 1600 * 1200)
+    {
+        min_area_ratio = 0.00003;
+        max_area_ratio = 0.1;
+    }
+    else
+    {
+        min_area_ratio = 0.00002;
+        max_area_ratio = 0.05;
+    }
+
+
+    return std::make_pair(min_area_ratio, max_area_ratio);
+}
 

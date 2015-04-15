@@ -97,26 +97,25 @@ void BoWDesc::initialize( const std::string &vocabulary_file, KeyPointDescPtr ke
 
 void BoWDesc::createTrainingData( const std::string &file_list, const std::string &output )
 {
-    loader ld;
-    auto train_images_path = ld.getFileList(file_list);
-    std::ofstream oss(output);
-    OutputWriter out(&oss);
-    
-    for ( const auto &info: train_images_path )
-    {
-        cv::Mat image = cv::imread( info.getPathToFile(), CV_LOAD_IMAGE_GRAYSCALE );
-        if ( image.empty() )
-        {
-            // std::cout << info.getPathToFile() << std::endl;
-            // TODO
-            // throw exception
-            continue;
-        }
-        // auto samples = featUtil::extract( image );
-        auto sample = getDescriptor(image);
-        out.write( sample, info.getLabel() );
-    }
-
+    // loader ld;
+    // auto train_images_path = ld.getFileList(file_list);
+    // std::ofstream oss(output);
+    // OutputWriter out(&oss);
+    //
+    // for ( const auto &info: train_images_path )
+    // {
+    //     cv::Mat image = cv::imread( info.getPathToFile(), CV_LOAD_IMAGE_GRAYSCALE );
+    //     if ( image.empty() )
+    //     {
+    //         // std::cout << info.getPathToFile() << std::endl;
+    //         // TODO
+    //         // throw exception
+    //         continue;
+    //     }
+    //     // auto samples = featUtil::extract( image );
+    //     auto sample = getDescriptor(image);
+    //     out.write( sample, info.getLabel() );
+    // }
 }
 
 

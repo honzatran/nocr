@@ -1,5 +1,3 @@
-find_package( Boost COMPONENTS program_options REQUIRED )
-
 set (exec_name 1stage-score)
 
 add_executable( ${exec_name} main.cpp )

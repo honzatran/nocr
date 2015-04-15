@@ -47,9 +47,10 @@ int main( int argc, char** argv )
 
     CvBoostParams params;
     params.boost_type = CvBoost::REAL;
-    params.weak_count = 50;
-    params.max_depth = 2;
-    params.max_categories = 2;
+    params.weight_trim_rate = 0.95;
+    // params.weak_count = 50;
+    // params.max_depth = 2;
+    // params.max_categories = 2;
 
     namespace po = boost::program_options;
     po::options_description desc("Usage");

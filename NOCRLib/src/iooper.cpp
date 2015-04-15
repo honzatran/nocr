@@ -45,27 +45,29 @@ vector<float> loader::parse( const string &lineWithNumbers )
     string tmpVal;
     while( getline( buffer, tmpVal, delim_ ) ) 
     {
-        // std::cout << tmpVal << std::endl;
+        // std::cout << tmpVal << " ";
         output.push_back( std::stof(tmpVal) );
     }
+    // std::cout << std::endl;
+
     return output;
 }
 
-vector< fileInfo> loader::getFileList( const string &textFile ) 
-{
-    ifstream in(textFile);
-    string tmpVal;
-    vector< fileInfo > output;
-    while( getline( in,tmpVal ) ) 
-    {
-        int tmpDelimPos = tmpVal.find( delim_ );
-        string filePath = tmpVal.substr( 0, tmpDelimPos );
-        string fileLabel = tmpVal.substr( tmpDelimPos + 1, string::npos );
-        
-        output.push_back( fileInfo( filePath, fileLabel) );
-    }
-    return output;
-}
+// vector< fileInfo> loader::getFileList( const string &textFile ) 
+// {
+//     ifstream in(textFile);
+//     string tmpVal;
+//     vector< fileInfo > output;
+//     while( getline( in,tmpVal ) ) 
+//     {
+//         int tmpDelimPos = tmpVal.find( delim_ );
+//         string filePath = tmpVal.substr( 0, tmpDelimPos );
+//         string fileLabel = tmpVal.substr( tmpDelimPos + 1, string::npos );
+//         
+//         output.push_back( fileInfo( filePath, fileLabel) );
+//     }
+//     return output;
+// }
 
 vector<string> loader::getFileContent( const std::string &file )
 {

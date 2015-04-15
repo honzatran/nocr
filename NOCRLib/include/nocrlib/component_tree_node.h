@@ -23,6 +23,7 @@ class ComponentTreeNode
 {
     public:
         typedef ComponentTreeNode<T> Node;
+        typedef T ValueType;
         Node *parent_;
         Node *next_, *prev_;
         Node *child_, *last_child_;
@@ -36,8 +37,16 @@ class ComponentTreeNode
          */
         ComponentTreeNode( const T &val )
             : parent_(nullptr), next_(nullptr), prev_(nullptr), 
-            child_(nullptr), depth_from_parent_(0), val_(val)
+            child_(nullptr), depth_from_parent_(0), size_(1), val_(val) 
         { 
+        }
+
+        template <typename ... ARGS>
+        ComponentTreeNode(ARGS &&... args)
+            : parent_(nullptr), next_(nullptr), prev_(nullptr),
+            child_(nullptr), depth_from_parent_(0), size_(1),
+            val_(std::forward<ARGS>(args)...) 
+        {
         }
 
         ~ComponentTreeNode()
@@ -48,7 +57,6 @@ class ComponentTreeNode
             child_ = nullptr;
         }
 
-        int size_;
 
         /**
          * @brief returns the information class T about the component
@@ -77,6 +85,8 @@ class ComponentTreeNode
             child_ = new_child;
             new_child->depth_from_parent_ = 1;
             new_child->parent_ = this;
+
+            size_ += new_child->size_;
         }
 
         /**
@@ -160,10 +170,12 @@ class ComponentTreeNode
                 parent_->child_ = child_;
                 parent_->last_child_ = last_child_;
             }
+
+            parent_->size_ -= 1;
         }
 
         template <typename Functor>
-        void visit(Functor & functor)
+        void visit(Functor && functor)
         {
             std::stack<ComponentTreeNode<T> *> stack_node;
 
@@ -186,6 +198,8 @@ class ComponentTreeNode
         }
 
 
+        std::size_t getNodeCount() const { return size_; }
+        std::size_t size_;
     private:
         T val_;
 };
