@@ -30,15 +30,15 @@ string icdar_gt_file = "";
 double min_area_ratio = 0.000035;
 double max_area_ratio = 0.1;
 
-pair<string, string> parse(const string & line)
-{
-    stringstream ss(line);
-    string path, gt_file_name;
-    std::getline(ss, path, ':');
-    std::getline(ss, gt_file_name, ':');
-
-    return make_pair(path, gt_file_name);
-}
+// pair<string, string> parse(const string & line)
+// {
+//     stringstream ss(line);
+//     string path, gt_file_name;
+//     std::getline(ss, path, ':');
+//     std::getline(ss, gt_file_name, ':');
+//
+//     return make_pair(path, gt_file_name);
+// }
 
 int main(int argc, char ** argv)
 {
@@ -93,13 +93,12 @@ int main(int argc, char ** argv)
     ERTree er_tree(min_area_ratio, max_area_ratio);
     er_tree.setMinGlobalProbability(0.2);
     er_tree.setMinDifference(0.1);
-    er_tree.setDelta(4);
+    er_tree.setDelta(8);
 
     std::unique_ptr<ERFilter1Stage> er_function( new ERFilter1Stage() );
     er_function->loadConfiguration(er1_conf_file);
 
     er_tree.setERFunction(std::move(er_function));
-    ComponentTreeBuilder<ERTree> builder( &er_tree );
 
     std::unique_ptr<LetterSegmentTesting> letter_test;
     if (second_stage_filter)
@@ -135,28 +134,18 @@ int main(int argc, char ** argv)
         std::tie(min_area_ratio, max_area_ratio) =
             ErLimitSize::getErSizeLimits(image.size());
 
-        er_tree.setMinAreaRatio(min_area_ratio);
-        er_tree.setMaxAreaRatio(max_area_ratio);
-        er_tree.setImage(image);
 
         letter_test->setImageName(gt_file_name, image);
+        process(er_tree, image, *letter_test);
 
-        builder.buildTree();
-        er_tree.transformExtreme();
-        er_tree.processTree(*letter_test);
-        er_tree.deallocateTree();
-
-        er_tree.invertDomain();
-
-        builder.buildTree();
-        er_tree.transformExtreme();
-        er_tree.processTree(*letter_test);
-        er_tree.deallocateTree();
-
+        cv::Mat img = letter_test->getCurrentImage();
         if (!dir.empty())
         {
-            cv::Mat img = letter_test->getCurrentImage();
             saver.saveImage(dir + "/" + getFileName(file_path), img);
+        }
+        else
+        {
+            gui::showImage(img, "detected letters");
         }
     }
 

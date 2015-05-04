@@ -17,14 +17,15 @@ using namespace std;
 void ImageWorker::loadConfiguration(const std::string &dict, const std::string &er_first_stage,
                                     const std::string &er_second_stage, const std::string &merge_conf)
 {
-    text_recognition_.loadConfiguration(er_first_stage,er_second_stage,merge_conf);
+    text_recognition_.constructExtractionMethod(er_first_stage,er_second_stage);
+    text_recognition_.loadEquivConfiguration(merge_conf);
     dictionary_.loadWords(dict);
 }
 
 void ImageWorker::loadOcr(std::unique_ptr<AbstractOCR> ocr)
 {
-    // force move semantic
     ocr_ = std::move(ocr);
+    // force move semantic
     // pointer ocr isn't valid anymore
     text_recognition_.loadOcr(ocr_.get());
 }

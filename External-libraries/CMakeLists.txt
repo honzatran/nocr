@@ -20,7 +20,7 @@
 
 add_subdirectory( ./pugixml)
 add_subdirectory( ./libsvm-3.18)
-add_subdirectory( ./liblinear-1.94)
+# add_subdirectory( ./liblinear-1.94)
 
 
 

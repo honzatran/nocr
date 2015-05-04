@@ -190,9 +190,9 @@ class ERFilter2Stage
         void clearLetters();
     private:
         std::unique_ptr<AbstractFeatureExtractor> features_extractor_;
-        // LibSVM<feature::ERGeom1> svm_;
         std::vector<LetterStorage<ERStat> > storages_;
 
+        // LibSVM<feature::ERGeom1> svm_;
         ScalingLibSVM<feature::ERGeom1> svm_;
 };
 
@@ -422,6 +422,14 @@ class ERTree
         void transformExtreme();
 
         /**
+         * @brief transform tree using the er 2 stage classifier,
+         *
+         * Removes all nodes from tree ,that are classified as non letter by 
+         * er 2 stage classifier
+         */
+        void transform2StageFiltering();
+
+        /**
          * @brief deletes all nodes, that are similar to their parent or children
          *
          * @param root root of the component tree
@@ -644,12 +652,20 @@ class ERTextDetection
          *
          * @param image input image, CV8UC3 required format
          *
-         * @return vector of letters candidates
+         * @return vector of letters candidates 
          *
          * Finds letter candidates in image using extremal approach algorithm.
          * If configs are not loaded, then assertion will fail.
          */
         std::vector< Storage > getLetters(const cv::Mat &image);
+
+        /**
+         * @brief finds component that represents letter in image
+         *
+         * @param image input image, required format CV8UC3 
+         *
+         * @return 
+         */
     private:
         ERTree extremal_region_;
 
@@ -769,6 +785,8 @@ class SegmentationPolicy<ERTextDetection>
         const static double k_epsilon;
 };
 
+
+
 class ComponentExtractor
 {
 public:
@@ -786,6 +804,67 @@ class ErLimitSize
 public:
     static std::pair<double, double> getErSizeLimits(const cv::Size & size);
 };
+
+/**
+ * @brief builds er_tree, and process the tree with \p functor
+ *
+ * @tparam SECOND_STAGE_FILTER if true nodes that doesn't pass er 2stage are deleted from tree
+ * @tparam REJECT_SIMILAR if true similar nodes in tree are deleted
+ * @tparam F
+ *
+ * @param er_tree er_tree, class used for building er tree, must have initialized classifiers
+ * @param image input image, required format CV_8UC3
+ * @param functor functor for processing tree
+ *
+ * Build an er tree, rejects all non extreme nodes, optionally perform second stage filtering and rejecting similar,
+ * afterward process \p functor on \p er_tree.
+ */
+template <bool SECOND_STAGE_FILTER = false, bool REJECT_SIMILAR = false, typename F> 
+void process(ERTree & er_tree, const cv::Mat & image, F & functor)
+{
+    double min_area_ratio, max_area_ratio;
+
+    std::tie(min_area_ratio, max_area_ratio) =
+        ErLimitSize::getErSizeLimits(image.size());
+
+    er_tree.setMinAreaRatio(min_area_ratio);
+    er_tree.setMaxAreaRatio(max_area_ratio);
+    er_tree.setImage(image);
+
+    ComponentTreeBuilder<ERTree> builder( &er_tree );
+
+    builder.buildTree();
+    er_tree.transformExtreme();
+    if (SECOND_STAGE_FILTER)
+    {
+        er_tree.transform2StageFiltering();
+    }
+
+    if (REJECT_SIMILAR)
+    {
+        er_tree.rejectSimilar();
+    }
+
+    er_tree.processTree(functor);
+    er_tree.deallocateTree();
+
+    er_tree.invertDomain();
+
+    builder.buildTree();
+    er_tree.transformExtreme();
+    if (SECOND_STAGE_FILTER)
+    {
+        er_tree.transform2StageFiltering();
+    }
+
+    if (REJECT_SIMILAR)
+    {
+        er_tree.rejectSimilar();
+    }
+    er_tree.processTree(functor);
+    er_tree.deallocateTree();
+}
+
 
 
 #endif /* extremal_region.h */

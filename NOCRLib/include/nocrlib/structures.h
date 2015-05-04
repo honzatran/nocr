@@ -55,7 +55,7 @@ struct ImageLetterInfo
 
     cv::Vec4f object_mean_;
     cv::Vec4f border_mean_;
-    double swt_mean_;
+    float swt_mean_;
 };
 
 /**
@@ -102,6 +102,7 @@ class TranslationInfo
         double getConfidence() const { return confidence_; }
 
         static bool haveSameLabels(char a, char b);
+        static std::vector<int> getLabels(const std::string & str);
     private:
         char translation_;
         std::vector<double> probabilities_;
@@ -275,7 +276,7 @@ class Letter
          *
          * @return probability of letter being character c
          */
-        double getProbability( char c )
+        double getProbability( char c ) const
         {
             return translation_.getProbability(c);
         }
@@ -395,6 +396,13 @@ class Word
          * @return letters in word
          */
         std::vector<Letter> getLetters() const { return letters_; }
+
+        /**
+         * @brief get centroids of all letters in word
+         *
+         * @return 
+         */
+        std::vector<cv::Point> getCentroids() const;
 
         /**
          * @brief get number of letters in word

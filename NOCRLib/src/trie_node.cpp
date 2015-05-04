@@ -31,12 +31,24 @@ TrieNode* TrieNode::contain( char letter )
        return nullptr; 
     }
     return it->second;
+    //
+    // auto it = std::find_if(childs_.begin(), childs_.end(),
+    //         [=letter](const std::pair<char, TrieNode *> & pair)
+    //         {
+    //             return letter == pair.first;  
+    //         });
+    //
+    // if ( it == childs_.end() ) 
+    // {
+    //    return nullptr; 
+    // }
+    // return it->second;
 }
 
 TrieNode* TrieNode::addNode( char letter )
 {
     TrieNode* newChild = new TrieNode();
-    auto it = childs_.insert( std::pair<char,TrieNode*>( letter, newChild ) );
+    auto it = childs_.insert( std::make_pair(letter, newChild ) );
     return it.first->second; 
 }
 

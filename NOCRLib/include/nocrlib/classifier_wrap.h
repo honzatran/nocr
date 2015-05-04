@@ -9,8 +9,6 @@
 #ifndef NOCRLIB_DESTREE_H 
 #define NOCRLIB_DESTREE_H 
 
-#define DEBUG 0
-
 #include "swt.h"
 #include "component.h"
 #include "drawer.h"
@@ -20,7 +18,6 @@
 #include "assert.h"
 
 #include <libsvm/svm.h>
-#include <liblinear/linear.h> 
 
 #include <pugi/pugixml.hpp>
 
@@ -533,18 +530,18 @@ class LibSVM
 
 
 /// @cond
-class LibLINEARTrainBridge
-{
-    public:
-        model* trainModel( const cv::Mat &train_data,
-                const cv::Mat &labels, parameter *param );
-
-        feature_node* constructSample
-            ( const std::vector<float> &output ) const;
-    private:
-        problem constructProblem
-            ( const cv::Mat &train_data, const cv::Mat &labels ) const;
-};
+// class LibLINEARTrainBridge
+// {
+//     public:
+//         model* trainModel( const cv::Mat &train_data,
+//                 const cv::Mat &labels, parameter *param );
+//
+//         feature_node* constructSample
+//             ( const std::vector<float> &output ) const;
+//     private:
+//         problem constructProblem
+//             ( const cv::Mat &train_data, const cv::Mat &labels ) const;
+// };
 /// @endcond
 
 /**
@@ -552,115 +549,115 @@ class LibLINEARTrainBridge
  *
  * @tparam F enum representing specific descriptor
  */
-template <feature F>
-class LibLINEAR
-{
-    public:
-        LibLINEAR() = default;
-        ~LibLINEAR() 
-        {
-            free_and_destroy_model( &model_ );
-        }
-
-        int getNumberOfClasses() const 
-        {
-            return number_of_classes_; 
-        }
-
-        /**
-         * @brief train data without any scaling
-         *
-         * @param data_file path to file
-         * @param param parameter for svm training
-         *
-         * See the OpenCV documentation for more detail on
-         * parameters for training opencv.
-         */
-        void train( const std::string &data_file, parameter *param )
-        {
-            cv::Mat train_data, labels;
-            LoadTrainData<F>::load( data_file, train_data, labels );
-            
-            model_ = bridge_.trainModel( train_data, labels, param );
-            number_of_classes_ = get_nr_class( model_ );
-        }
-
-        /**
-         * @brief loads configuration from \p conf_file
-         *
-         * @param conf_file path to the configuration
-         */
-        void saveConfiguration( const std::string &conf_file )
-        {
-            int result = save_model( conf_file.c_str(), model_ );
-            if (result != 0)
-            {
-                throw ActionError( "saving to " + conf_file );
-            }
-        }
-
-        /**
-         * @brief loads configuration from \p conf_file
-         *
-         * @param conf_file path to the configuration
-         * @throw FileNotFoundException when file \p conf_file doesn't exist
-         */
-        void loadConfiguration( const std::string &conf_file )
-        {
-            model_ = load_model( conf_file.c_str() );
-            //TODO
-            if ( model_ == nullptr )
-            {
-                throw FileNotFoundException(conf_file + ", svm configuration not found");
-            }
-            number_of_classes_ = get_nr_class( model_ );
-        }
-
-        /**
-         * @brief predicts class for feature vector sample
-         *
-         * @param sample vector of features
-         *
-         * @return label of predicted class
-         */
-        float predictSample(const std::vector<float> &data ) const
-        {
-            NOCR_ASSERT( model_ != nullptr, "no configuration loaded" );
-
-            feature_node *nodes = bridge_.constructSample( data );
-            float out = predict( model_ , nodes );
-            delete[] nodes;
-            return out;
-        }
-
-        /**
-         * @brief predicts class for feature vector sample
-         *
-         * @param sample vector of features
-         * @param probabilities probability outputs from classification 
-         * will be stored in this vector
-         *
-         * @return label of predicted class
-         *
-         * If SVM isn't trained for probability outputs, exception will be thrown.
-         */
-        double predictProbabilities( const std::vector<float> &data, 
-                std::vector<double> &probabilities ) const  
-        {
-            NOCR_ASSERT( model_ != nullptr, "no configuration loaded" );
-
-            feature_node *nodes = bridge_.constructSample( data );
-            probabilities.resize( number_of_classes_ );
-            double out = predict_probability( model_ , nodes, probabilities.data() ); 
-            delete[] nodes;
-            return out;
-        }
-
-    private:
-        LibLINEARTrainBridge bridge_;
-        model *model_; 
-        int number_of_classes_;
-};
+// template <feature F>
+// class LibLINEAR
+// {
+//     public:
+//         LibLINEAR() = default;
+//         ~LibLINEAR() 
+//         {
+//             free_and_destroy_model( &model_ );
+//         }
+//
+//         int getNumberOfClasses() const 
+//         {
+//             return number_of_classes_; 
+//         }
+//
+//         #<{(|*
+//          * @brief train data without any scaling
+//          *
+//          * @param data_file path to file
+//          * @param param parameter for svm training
+//          *
+//          * See the OpenCV documentation for more detail on
+//          * parameters for training opencv.
+//          |)}>#
+//         void train( const std::string &data_file, parameter *param )
+//         {
+//             cv::Mat train_data, labels;
+//             LoadTrainData<F>::load( data_file, train_data, labels );
+//             
+//             model_ = bridge_.trainModel( train_data, labels, param );
+//             number_of_classes_ = get_nr_class( model_ );
+//         }
+//
+//         #<{(|*
+//          * @brief loads configuration from \p conf_file
+//          *
+//          * @param conf_file path to the configuration
+//          |)}>#
+//         void saveConfiguration( const std::string &conf_file )
+//         {
+//             int result = save_model( conf_file.c_str(), model_ );
+//             if (result != 0)
+//             {
+//                 throw ActionError( "saving to " + conf_file );
+//             }
+//         }
+//
+//         #<{(|*
+//          * @brief loads configuration from \p conf_file
+//          *
+//          * @param conf_file path to the configuration
+//          * @throw FileNotFoundException when file \p conf_file doesn't exist
+//          |)}>#
+//         void loadConfiguration( const std::string &conf_file )
+//         {
+//             model_ = load_model( conf_file.c_str() );
+//             //TODO
+//             if ( model_ == nullptr )
+//             {
+//                 throw FileNotFoundException(conf_file + ", svm configuration not found");
+//             }
+//             number_of_classes_ = get_nr_class( model_ );
+//         }
+//
+//         #<{(|*
+//          * @brief predicts class for feature vector sample
+//          *
+//          * @param sample vector of features
+//          *
+//          * @return label of predicted class
+//          |)}>#
+//         float predictSample(const std::vector<float> &data ) const
+//         {
+//             NOCR_ASSERT( model_ != nullptr, "no configuration loaded" );
+//
+//             feature_node *nodes = bridge_.constructSample( data );
+//             float out = predict( model_ , nodes );
+//             delete[] nodes;
+//             return out;
+//         }
+//
+//         #<{(|*
+//          * @brief predicts class for feature vector sample
+//          *
+//          * @param sample vector of features
+//          * @param probabilities probability outputs from classification 
+//          * will be stored in this vector
+//          *
+//          * @return label of predicted class
+//          *
+//          * If SVM isn't trained for probability outputs, exception will be thrown.
+//          |)}>#
+//         double predictProbabilities( const std::vector<float> &data, 
+//                 std::vector<double> &probabilities ) const  
+//         {
+//             NOCR_ASSERT( model_ != nullptr, "no configuration loaded" );
+//
+//             feature_node *nodes = bridge_.constructSample( data );
+//             probabilities.resize( number_of_classes_ );
+//             double out = predict_probability( model_ , nodes, probabilities.data() ); 
+//             delete[] nodes;
+//             return out;
+//         }
+//
+//     private:
+//         LibLINEARTrainBridge bridge_;
+//         model *model_; 
+//         int number_of_classes_;
+// };
 
 
 /**

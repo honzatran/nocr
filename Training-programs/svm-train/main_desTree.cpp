@@ -26,6 +26,8 @@
 //using namespace cv;
 using namespace std;
 
+#define PROB_ESTIMATES "prob-estimates"
+
 
 template <feature F>
 void trainSVM(svm_parameter * param, const std::string & input, const std::string & output,
@@ -45,6 +47,7 @@ void trainSVM(svm_parameter * param, const std::string & input, const std::strin
     }
 }
 
+
 int main( int argc, char** argv )
 {
     std::string input, output;
@@ -59,7 +62,7 @@ int main( int argc, char** argv )
     param.kernel_type = RBF;
     param.degree = 3;
     // param.gamma = 2;
-    param.gamma = 0.14;
+    param.gamma = 1./144.;
     param.coef0 = 0;
     param.nu = 0.5;
     param.cache_size = 100;
@@ -68,12 +71,12 @@ int main( int argc, char** argv )
     param.p = 0.1;
     param.shrinking = 0;
     param.probability = 0;
-    // param.probability = 0;
     param.nr_weight = 0;
     param.weight_label = NULL;
     param.weight = NULL;
 
     std::string scaling = "";
+    bool prob_estimates = false;
 
 
     namespace po = boost::program_options;
@@ -89,6 +92,7 @@ int main( int argc, char** argv )
         (hog.c_str(), "hog ocr descriptors")
         ("gamma", po::value<double>(&param.gamma), "gamma parameter for training")
         ("c-value", po::value<double>(&param.C), "C parameter for training")
+        (PROB_ESTIMATES, "enable probability estimates")
         ("scaling", po::value<string>(&scaling), "turn on scaling of train data");
 
     try 
@@ -110,6 +114,11 @@ int main( int argc, char** argv )
         return 0;
     }
 
+    if (vm.count(PROB_ESTIMATES))
+    {
+        param.probability = 1;
+    }
+
     if (vm.count(er_geom.c_str()) )
     {
         trainSVM<feature::ERGeom>(&param, input, output, scaling);
@@ -123,6 +132,8 @@ int main( int argc, char** argv )
         svm_destroy_param(&param);
         return 0;
     }
+
+
 
     if (vm.count(swt.c_str()))
     { 

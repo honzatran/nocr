@@ -11,6 +11,8 @@
 #include "../include/nocrlib/trie_node.h"
 #include "../include/nocrlib/assert.h"
 #include "../include/nocrlib/utilities.h"
+#include "../include/nocrlib/drawer.h"
+#include "../include/nocrlib/levenstein_distance.h"
 
 #include <iostream>
 #include <locale>
@@ -19,17 +21,20 @@
 
 #include <opencv2/core/core.hpp>
 
+#define WORD_DESCRIPTOR 1
+
 using namespace std;
 
 WordGenerator::WordGenerator( const VecLetter &letters, 
-    const LetterWordEquiv &equivalence )
+    const LetterWordEquiv &equivalence, const cv::Mat & image )
 {
-    initHorizontalDetection( letters, equivalence );
+    initHorizontalDetection( letters, equivalence, image );
 }
 
 // =================== initializations for detection =============
 void WordGenerator::initHorizontalDetection
-    ( const VecLetter &letters, const LetterWordEquiv &equivalence )
+    ( const VecLetter &letters, const LetterWordEquiv &equivalence,
+      const cv::Mat & image )
 {
     letters_ = letters;
 
@@ -38,23 +43,52 @@ void WordGenerator::initHorizontalDetection
     {
         return a.getLeftBorder() < b.getLeftBorder();
     });
+
+    initWordDescPrototypes(image);
+
+#if WORD_GENERATOR_DEBUG
+    std::unique_ptr<DrawerInterface> drawer( new BinaryDrawer() );
+    drawer->init(image);
+    for ( const auto &l : letters )
+    {
+        drawer->draw(l);
+    }
+
+    // std::unique_ptr<DrawerInterface> rect_drawer( new RectangleDrawer() );
+    // rect_drawer->init(drawer->getImage());
+    //
+    // for ( const auto &l : letters )
+    // {
+    //     rect_drawer->draw(l);
+    // }
+
+    cv::Mat edge_img = drawer->getImage();
+    image_ = edge_img;
+#endif
     
-    fillRelationTables( equivalence, [] (const Letter &a, const Letter &b) 
+    fillRelationTables( equivalence, [this] (const Letter &a, const Letter &b) -> EdgeWeights
             {
-                cv::Point a_top_right( a.getRightBorder(), a.getUpperBorder() );
-                cv::Point b_top_left( b.getLeftBorder(), b.getUpperBorder() );
+                cv::Point a_top_right( a.getRightBorder(), a.getUpperBorder());
+                cv::Point b_top_left( b.getLeftBorder(), b.getUpperBorder());
                 cv::Point2d diff = a_top_right - b_top_left;
 
                 double tmp = diff.x * diff.x / a.getWidth() + 
                     diff.y * diff.y / a.getHeight();
-                return std::sqrt( tmp );
+
+
+
+                double space_dist = spaceDist(a, b);
+
+                return { std::sqrt( tmp ), space_dist};
             });
 
     fillEmptyScore();
+
+   // evaluator_.loadConfiguration("boost_dccost.xml");
 }
 
 void WordGenerator::initVerticalDetection
-    ( const VecLetter &letters, const LetterWordEquiv &equivalence )
+    ( const VecLetter &letters, const LetterWordEquiv &equivalence, const cv::Mat & image )
 {
     letters_ = letters;
 
@@ -64,7 +98,9 @@ void WordGenerator::initVerticalDetection
         return a.getUpperBorder() < b.getUpperBorder();
     });
     
-    fillRelationTables( equivalence, [] (const Letter &a, const Letter &b) 
+    initWordDescPrototypes(image);
+
+    fillRelationTables( equivalence, [] (const Letter &a, const Letter &b) -> EdgeWeights
             {
                 cv::Point a_bottom_left( a.getLeftBorder(), a.getLowerBorder() );
                 cv::Point b_top_left( b.getLeftBorder(), a.getUpperBorder() );
@@ -72,7 +108,7 @@ void WordGenerator::initVerticalDetection
 
                 double tmp = diff.x * diff.x / a.getWidth() + 
                     diff.y * diff.y / a.getHeight();
-                return std::sqrt( tmp );
+                return { std::sqrt(tmp), 0};
             });
 
     fillEmptyScore();
@@ -136,9 +172,10 @@ void WordGenerator::initializeTable()
 {
     // 1 phase of algorithm
     int size = letters_.size();
+    rows_ = size;
+    cols_ = max_length_;
     double empty_score_sum = empty_score_.back();
-    succesors_ = Matrix<int>( size, vector<int>( max_length_,-1 ));
-    optimal_score_ = Matrix<double>( size, vector<double>( max_length_, 0 ) );
+    optimal_score_ = std::vector<double>( rows_ * cols_ , 0);
 
     for ( int p = max_length_ - 1; p >= 0; --p ) 
     {
@@ -146,7 +183,7 @@ void WordGenerator::initializeTable()
         for ( int i = size-1; i >= 0; --i ) 
         {
             double empty_score = empty_score_sum - empty_score_[i];
-            optimal_score_[i][p] = letters_[i].getProbability(c)+ empty_score; 
+            optimal_score_[i + p * rows_] = letters_[i].getProbability(c)+ empty_score; 
         }
     }
 }
@@ -163,12 +200,15 @@ void WordGenerator::updateTable()
         {
             int max_row, max_col;
             double max_score; 
-            std::tie( max_row, max_col, max_score ) = findMaxSuccesor( i, i+1, p+1 );
+            std::tie( max_row, max_col, max_score ) = findMaxSuccesor( i, i+1, p+1, descriptors_informations_[0] );
             double max_value = letters_[i].getProbability(c) + max_score ;
-            if ( optimal_score_[i][p] < max_value )
+            if ( optimal_score_[i + p * rows_] < max_value )
             {
-                optimal_score_[i][p] = max_value;
-                succesors_[i][p] = max_row * max_length_ + max_col;
+                optimal_score_[i + p * rows_] = max_value;
+
+                descriptors_informations_[i + current_depth_ * rows_].succesor = max_row * max_length_ + max_col;
+                // descriptors_informations_[i + current_depth_ * rows_].merge(
+                //         descriptors_informations_[max_col * rows_ + max_row]);
             }
         }
     }
@@ -176,7 +216,8 @@ void WordGenerator::updateTable()
 
 // ============== methods for table information extraction ==============
 
-std::tuple<int, int, double> WordGenerator::findMaxSuccesor( int base_index, int start_optimal_row, int start_optimal_col )
+std::tuple<int, int, double> WordGenerator::findMaxSuccesor( int base_index, int start_optimal_row, int start_optimal_col, 
+        WordDescriptors & word_descriptors )
 {
     double max_score = std::numeric_limits<double>::lowest();
     double max_probability = max_score;
@@ -188,28 +229,89 @@ std::tuple<int, int, double> WordGenerator::findMaxSuccesor( int base_index, int
     int max_row = 0;
     int max_col = 0;
 
+    WordDescriptors max_descriptor;
+
     auto range = edges_.equal_range(base_index);
+    cv::Rect base_bbox =  letters_[base_index].getRectangle();
+    cv::Point base_tl = base_bbox.tl();
+    cv::Point base_bl = base_tl + cv::Point(0, base_bbox.height);
 
     // check all possible neighbours
     for ( auto it = range.first; it != range.second; ++it )
     {
         int j;
-        double deformation_cost;
-        std::tie(j, deformation_cost) = it->second;
+        EdgeWeights edge_weights;
+        std::tie(j, edge_weights) = it->second;
         // int j = it->second;
+        //
+        cv::Rect n_bbox = letters_[j].getRectangle();
+        cv::Point n_tl = n_bbox.tl();
+        cv::Point n_bl = n_tl + cv::Point(0, n_bbox.height);
+
         double empty_score = getEmptyScore( base_index + 1, j - 1 ); 
         for ( int q = start_optimal_col; q < max_length_; ++q )
         {
-            double score = optimal_score_[j][q] + empty_score - k_theta * deformation_cost;
+            double score = optimal_score_[j + q * rows_] + empty_score;
+            std::size_t succesor = descriptors_informations_[j + q * rows_].succesor/cols_;
+            cv::Rect n2_bbox = letters_[succesor].getRectangle();
+            cv::Point n2_tl = n2_bbox.tl();
+#if WORD_GENERATOR_DEBUG
+            if (descriptors_informations_[j + q * rows_].letters_count > 1)
+            {
+                double angle_tl = angle(base_tl, n_tl, n2_tl);
+                double angle_bl = angle(base_bl, n_bl, n2_tl + cv::Point(0, n2_bbox.height));
+                
+                if (std::max(angle_tl, angle_bl) < 2.5)
+                {
+                    continue;
+                }
+            }
+#endif
+
+
+            auto tmp = mergeDescriptors(word_descriptors, descriptors_informations_[j + q * rows_], edge_weights.space_dist);
+            // uhel
+            // if (tmp.letters_count > 5)
+            // {
+            //     double word_score = evaluator_.getCost(tmp.getDescriptor());
+            //     score -= word_score;
+            // }
+            // else 
+            // {
+                // score -= (1 - k_theta) * edge_weights.deformation_cost;
+                // score -= 0.2 * edge_weights.deformation_cost;
+            // }
+            //
+//             if (tmp.letters_count > 2)
+//             {
+//                 score -= 0.5 * tmp.getDistStDeviation();
+//             }
+//
+//             if (tmp.letters_count > 3)
+//             {
+//                 score -= tmp.getAngleStdDeviation();
+// #if WORD_GENERATOR_DEBUG
+//                 cout << tmp.getAngleStdDeviation() << endl;
+// #endif
+//             }
+//             else if (tmp.letters_count == 3)
+//             {
+//                 score -= (CV_PI - tmp.angle)/(CV_PI);
+//             }
+
             if ( max_score < score )
             {
                 max_score = score; 
                 max_row = j;
                 max_col = q;
-                max_probability = optimal_score_[j][q] + empty_score;
+                max_probability = optimal_score_[j + q * rows_] + empty_score;
+                max_descriptor = tmp;
             }
         }
     }
+
+    word_descriptors = max_descriptor;
+
     return std::make_tuple( max_row, max_col, max_probability ); 
 }
 
@@ -225,7 +327,7 @@ std::tuple< int, int, double > WordGenerator::findMaxConfiguration( int start_ro
         double empty_score = getEmptyScore( start_row, i - 1 ); 
         for ( int j = start_col; j < max_length_; ++j )
         {
-            double val = optimal_score_[i][j] + empty_score;
+            double val = optimal_score_[i + j * rows_] + empty_score;
             if ( val > max_score )
             {
                 max_row = i;
@@ -235,6 +337,7 @@ std::tuple< int, int, double > WordGenerator::findMaxConfiguration( int start_ro
             
         }
     }
+
     return std::make_tuple( max_row, max_col, max_score );
 }
 
@@ -261,13 +364,13 @@ vector<int> WordGenerator::reconstruct( int start_row, int start_col )
     int i = start_row; 
     int j = start_col;
 
-    int val = succesors_[i][j];
+    int val = descriptors_informations_[i + j * rows_].succesor;
     vector<int> word( 1, i );
     while ( val != -1 ) 
     {
         i = val / max_length_; 
         j = val % max_length_; 
-        val = succesors_[i][j];
+        val = descriptors_informations_[i + j * rows_].succesor;
         word.push_back(i);
     }
 
@@ -289,8 +392,12 @@ std::vector<TranslatedWord> WordGenerator::process( const Dictionary &dictionary
     current_depth_ = dictionary.getMaxLength();
     max_length_ = dictionary.getMaxLength();
 
-    optimal_score_ = Matrix<double>( letters_.size(), vector<double>( current_depth_, 0 ) );
-    succesors_ = Matrix<int>( letters_.size(), vector<int>( current_depth_, -1 ) );
+    rows_ = letters_.size();
+    cols_ = current_depth_;
+
+    optimal_score_ = std::vector<double>(rows_ * cols_ , 0);
+    descriptors_informations_.resize(rows_ * cols_);
+    
     maxima_ = std::vector<ScoreRecord>( max_length_ + 1, 
            ScoreRecord(-1, -1, std::numeric_limits<double>::lowest()) ); 
 
@@ -308,6 +415,7 @@ std::vector<TranslatedWord> WordGenerator::process( const Dictionary &dictionary
 
 
     // choose best words from lexicon
+
     used_letters_ = vector<bool>( letters_.size(), false );
     vector<TranslatedWord> output;
     for ( auto it = detected_words_.rbegin(); it != detected_words_.rend(); ++it )
@@ -353,7 +461,17 @@ void WordGenerator::traverse( TrieNode *node, std::string &word )
 
         maxima_[current_depth_].tie( max_row, max_col, max_value );
         vector<int> indices = reconstruct( max_row, max_col );
-        if ( indices.size() > 1 )
+        cv::Rect word_rec = letters_[indices[0]].getRectangle();
+
+        std::size_t area = word_rec.area();
+        for (std::size_t i = 1; i < indices.size(); ++i)
+        {
+            cv::Rect characted_rect  = letters_[indices[i]].getRectangle();
+            word_rec |= characted_rect;
+            area += characted_rect.area();
+        }
+
+        if ( indices.size() > 1)
         {
             if ( indices.size() < k_max_missing_letters )
             {
@@ -366,13 +484,38 @@ void WordGenerator::traverse( TrieNode *node, std::string &word )
                             std::make_pair( max_value, WordRecord( text, indices ) ) );
                 }
             }
-            else if ( indices.size() > word.size() - k_max_missing_letters )
+            else if ( indices.size() >= 3 * word.size()/4)
             {
                 std::string text = word;
                 std::reverse( text.begin(), text.end() );
-                detected_words_.insert( 
-                        std::make_pair( max_value, WordRecord( text, indices ) ) );
+
+                std::string tmp;
+                tmp += letters_[indices[0]].getTranslation();
+
+                for (std::size_t i = 1; i < indices.size(); ++i) 
+                {
+                    tmp += letters_[indices[i]].getTranslation();
+                }
+
+                std::vector<int> tmp_labels = TranslationInfo::getLabels(tmp);
+                std::vector<int> text_labels = TranslationInfo::getLabels(text);
+
+                LevensteinDistance<int> levenstein;
+                std::size_t edit_dist = levenstein(text_labels, tmp_labels);
+                
+                if (edit_dist <= std::max<std::size_t>(text.size()/4, 2) + 1)
+                {
+                    detected_words_.insert( 
+                            std::make_pair( max_value, WordRecord( text, indices ) ) );
+
+#if WORD_DESCRIPTOR
+                cout << text << " " << tmp << " " << endl;
+#endif
+                }
+
             }
+
+
         }
     }
 
@@ -395,20 +538,36 @@ void WordGenerator::updateTables( char current_letter )
     double empty_score_sum = empty_score_.back();
     for ( int i = letters_.size() - 1; i >= 0; --i )
     {
-        optimal_score_[i][current_depth_] = letters_[i].getProbability(current_letter)
+        optimal_score_[i + current_depth_ * rows_] = letters_[i].getProbability(current_letter)
             + empty_score_sum - empty_score_[i];
+        // tady se inicializujou hodnoty
+        // descriptors_informations_[i + current_depth_ * rows_] = descriptor_prototypes_[i];
     }
 
     for ( int i = letters_.size() - 1; i >= 0; --i )
     {
         int max_row, max_col;
         double max_score; 
-        std::tie( max_row, max_col, max_score ) = findMaxSuccesor( i, i+1, current_depth_ +1 ); 
+        WordDescriptors tmp = descriptor_prototypes_[i];
+       
+        std::tie( max_row, max_col, max_score ) = findMaxSuccesor( i, i+1, current_depth_ +1,
+                tmp);
+
         double max_value = letters_[i].getProbability(current_letter) + max_score ;
-        if ( optimal_score_[i][current_depth_] < max_value )
+        if ( optimal_score_[i + current_depth_ * rows_] < max_value )
         {
-            optimal_score_[i][current_depth_] = max_value;
-            succesors_[i][current_depth_] = max_row * max_length_ + max_col;
+            optimal_score_[i + current_depth_ * rows_] = max_value;
+            tmp.succesor = max_row * max_length_ + max_col;
+            
+            descriptors_informations_[i + current_depth_ * rows_] = tmp;
+
+            // descriptors_informations_[i + current_depth_ * rows_].merge(
+            //         descriptors_informations_[max_col * rows_ + max_row]);
+            // mergujeme informace o slove
+        }
+        else
+        {
+            descriptors_informations_[i + current_depth_ * rows_] = descriptor_prototypes_[i];
         }
     }
 
@@ -419,7 +578,14 @@ void WordGenerator::updateMaximal()
     maxima_[current_depth_] = maxima_[current_depth_+1];
     for ( size_t i = 0; i < letters_.size(); ++i )
     {
-        double score = getEmptyScore(0, i-1) + optimal_score_[i][current_depth_];
+        WordDescriptors & curr_desc = descriptors_informations_[i + current_depth_ * rows_];
+
+        double score = getEmptyScore(0, i-1) + optimal_score_[i + current_depth_ * rows_];
+        if (curr_desc.letters_count > 2)
+        {
+            score -= 0.1 * curr_desc.getDistStDeviation();
+        }
+
         if ( maxima_[current_depth_].score_ < score )
         {
             maxima_[current_depth_] = ScoreRecord( i, current_depth_, score );
@@ -430,7 +596,7 @@ void WordGenerator::updateMaximal()
 double WordGenerator::getMaxDistance( int i )
 {
     double diagonal = letters_[i].getDiagonal();
-    const double k_epsilon = 1.75;
+    const double k_epsilon = 3;
     return diagonal * k_epsilon;
 }
 
@@ -439,7 +605,8 @@ double WordGenerator::getDistance( int i, int j )
     cv::Point2d a_centroid = letters_[i].getCentroid();
     cv::Point2d b_centroid = letters_[j].getCentroid();
 
-    return norm( a_centroid - b_centroid );
+    return spaceDist(letters_[i], letters_[j]);
+    // return cv::norm(a_centroid - b_centroid);
 }
 
 double WordGenerator::getCharacterScoreOnly( const std::vector<int> &indices, double configuration_score )
@@ -465,6 +632,191 @@ std::vector<Letter> WordGenerator::getRemainingLetters() const
 
     return remaining_letters;
 }
+
+void WordGenerator::initWordDescPrototypes(const cv::Mat & image)
+{
+    image_ = image;
+    descriptor_prototypes_.reserve(letters_.size());
+    WordDeformation word_deformation;
+    word_deformation.setImage(image);
+
+    for (std::size_t i = 0; i < letters_.size(); ++i)
+    {
+        WordDescriptors prototype;
+
+        cv::Vec3f color_medians = word_deformation.getColorMedians(letters_[i]);
+        prototype.color_sums = color_medians;
+        prototype.color_sums_sqr = color_medians.mul(color_medians);
+    
+        prototype.succesor = -1;
+        prototype.letters_count = 1;
+        prototype.dist_sum = prototype.dist_sqr = 0;
+        prototype.height_sum = letters_[i].getHeight();
+        prototype.height_sqr = prototype.height_sum * prototype.height_sum;
+        prototype.center1 = letters_[i].getCentroid();
+        prototype.angle_sqr = 0;
+        prototype.angle_sum = 0;
+
+        descriptor_prototypes_.push_back(prototype);
+    }
+}
+
+double WordGenerator::spaceDist(const Letter & a, const Letter & b)
+{
+    cv::Point a_centroid = a.getCentroid();
+    cv::Point b_centroid = b.getCentroid();
+
+
+    double a_rx = a.getRightBorder();
+    double b_lx = b.getLeftBorder();
+
+    cv::Point tmp = b_centroid - a_centroid;
+    cv::Point diff(-tmp.y, tmp.x);
+    
+    float c = diff.x * a_centroid.x + diff.y * a_centroid.y;
+
+    double a_ry = (c - diff.x * a_rx)/diff.y;
+    if (a_ry < a.getUpperBorder())
+    {
+        a_ry = a.getUpperBorder();
+        a_rx = (c - diff.y * a_ry)/diff.x;
+    } 
+    else if (a_ry > a.getLowerBorder())
+    {
+        a_ry = a.getLowerBorder();
+        a_rx = (c - diff.y * a_ry)/diff.x;
+    }
+
+
+    double b_ly = (c - diff.x * b_lx)/diff.y;
+    if (b_ly < b.getUpperBorder())
+    {
+        b_ly = b.getUpperBorder();
+        b_lx = (c - diff.y * b_ly)/diff.x;
+    }
+    else if (b_ly > b.getLowerBorder())
+    {
+        b_ly = b.getLowerBorder();
+        b_lx = (c - diff.y * b_ly)/diff.x;
+    }
+
+    double centroid_dist = cv::norm(b_centroid - a_centroid);
+    double shorter_dist = cv::norm(cv::Point2d(a_rx, a_ry) - cv::Point2d(b_lx, b_ly));
+
+#if WORD_GENERATOR_DEBUG
+    // if (centroid_dist < shorter_dist)
+    // {
+    //     cv::Rect a_rect = a.getRectangle();
+    //     a_rect |= b.getRectangle();
+    //     cv::Mat tmp;
+    //     image_(a_rect).copyTo(tmp);
+    //     
+    //     cv::rectangle(tmp, a.getRectangle() - a_rect.tl(), 170);
+    //     cv::rectangle(tmp, b.getRectangle() - a_rect.tl(), 100);
+    //
+    //     gui::showImage(tmp, "wrong");
+    //
+    //     std::cout << centroid_dist << " " << shorter_dist  << std::endl;
+    //     std::cout << a.getTranslation() << " " << b.getTranslation() << std::endl;
+    // }
+#endif
+
+    return cv::norm(cv::Point(a_rx, a_ry) - cv::Point(b_lx, b_ly));
+    
+    // return cv::norm(a_centroid - b_centroid);
+}
+
+void WordGenerator::WordDescriptors::merge(const WordDescriptors & other, double space_dist)
+{
+    letters_count += other.letters_count;
+    color_sums += other.color_sums;
+    color_sums_sqr += other.color_sums_sqr;
+    height_sum += other.height_sum;
+    height_sqr += other.height_sqr;
+    
+    cv::Point v1 = center1 - other.center1;
+    
+    dist_sum += (space_dist+ other.dist_sum);
+    dist_sqr += (space_dist * space_dist + other.dist_sqr);
+
+    center2 = other.center1;
+    if (letters_count > 2)
+    {
+        cv::Point v2 = other.center2 - other.center1;
+        angle = std::acos(v1.ddot(v2)/(cv::norm(v1) * cv::norm(v2)));
+
+        angle_sum += angle;
+        angle_sqr += angle * angle;
+    }
+    else
+    {
+        angle = CV_PI;
+    }
+
+}
+
+float WordGenerator::WordDescriptors::getDistStDeviation() const
+{
+    int k = letters_count - 1;
+    float dist_mean = dist_sum/k;
+    float dist_variation = (dist_sqr + k * dist_mean * dist_mean - 2 * dist_mean * dist_sum)/(k - 1);
+
+    return std::sqrt(dist_variation);
+}
+
+float WordGenerator::WordDescriptors::getAngleStdDeviation() const
+{
+    int k = letters_count - 2;
+
+    float angle_mean = angle_sum/k;
+    float angle_variation = (angle_sqr+ k * angle_mean* angle_mean - 2 * angle_mean * angle_sum)/(k - 1);
+
+    return std::sqrt(angle_variation);
+}
+
+auto WordGenerator::mergeDescriptors(const WordGenerator::WordDescriptors & a,
+        const WordGenerator::WordDescriptors & b, double space_dist) -> WordDescriptors
+{
+    WordDescriptors tmp = a;
+    tmp.merge(b, space_dist);
+
+    return tmp;
+}
+
+std::vector<float> WordGenerator::WordDescriptors::getDescriptor() const
+{
+    cv::Vec3f means, variance;
+    means = color_sums * (1./letters_count);
+    variance = color_sums_sqr + (int)letters_count * means.mul(means) - 2 * means.mul(color_sums);
+    variance *= (1./(letters_count - 1));
+    
+    cv::Vec3f coef_variation;
+
+    coef_variation[0] = std::sqrt(variance[0])/means[0];
+    coef_variation[1] = std::sqrt(variance[1])/means[1];
+    coef_variation[2] = std::sqrt(variance[2])/means[2];
+
+    coef_variation *= (1. + 1./(4 * letters_count));
+
+    int k = letters_count - 1;
+    float dist_mean = dist_sum/k;
+    float dist_variation = (dist_sqr + k * dist_mean * dist_mean - 2 * dist_mean * dist_sum)/(k - 1);
+
+    // cout << dist_mean << " " << dist_variation << endl;
+    float dist_coef_variation = std::sqrt(dist_variation)/dist_mean * (1. + 1./(4 * k));
+
+    k++;
+    float height_mean = (float)height_sum/k;
+    float height_variation= (height_sqr + k * height_mean * height_mean - 2 * height_mean * height_sum)/(k - 1);
+
+    float height_coef_variation = std::sqrt(height_variation)/height_mean * (1. + 1./(4 * k));
+
+    return { coef_variation[0], coef_variation[1], coef_variation[2], 
+        angle, dist_coef_variation, height_coef_variation };
+}
+
+
+
 
 
 //======================Wang word generator====================

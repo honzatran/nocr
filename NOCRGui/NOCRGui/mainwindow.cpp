@@ -291,15 +291,17 @@ void MainWindow::setUpWorker()
 {
     const std::string dict = "conf/dict";
     // const std::string boost_ER1Phase = "conf/boostGeom.conf";
-    const std::string boost_ER1Phase = "conf/boost_er1stage.conf";
+    const std::string boost_ER1Phase = "boost_er1stage_handpicked.xml";
     // const std::string svm_ER2Phase = "conf/svmERGeom.conf";
-    const std::string svm_ER2Phase = "conf/svm_er2stage.conf";
+    // const std::string svm_ER2Phase = "svm_er2stage_handpicked.xml";
+    const std::string svm_ER2Phase = "scaled_svmEr2_handpicked.xml";
     const std::string svm_merge = "conf/svmMerge.conf";
-    const std::string ocr_conf = "conf/iksvm.conf";
+    // const std::string ocr_conf = "conf/iksvm.conf";
+    const std::string ocr_conf = "training/svm_hog.xml";
 
     image_worker_.loadConfiguration( dict, boost_ER1Phase, svm_ER2Phase,
                                      svm_merge);
-    std::unique_ptr<AbstractOCR> ocr( new MyOCR(ocr_conf) );
+    std::unique_ptr<AbstractOCR> ocr( new HogRBFOcr(ocr_conf) );
     image_worker_.loadOcr(std::move(ocr));
     image_worker_.moveToThread(worker_thread_);
 

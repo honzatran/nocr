@@ -35,7 +35,7 @@ int main ( int argc, char** argv )
     vector<string> input_lists;
 
 
-    std::string svm_ER2Phase = "scaled_svmEr2.xml";
+    std::string svm_ER2Phase = "scaled_svmEr2_handpicked.xml";
     namespace po = boost::program_options;
     po::options_description desc("Usage");
     desc.add_options()
@@ -104,16 +104,22 @@ int main ( int argc, char** argv )
     // const std::string svm_ER2Phase = "conf/svmERGeom.conf";
     // std::string svm_ER2Phase = "svm_er2stage.conf";
     const std::string svm_merge = "conf/svmMerge.conf";
-    const std::string ocr_conf = "conf/iksvm.conf";
+    // const std::string ocr_conf = "conf/iksvm.conf";
+    // const std::string ocr_conf = "training/train_hog_ocr.xml";
+
+    const std::string ocr_conf = "training/svm_hog.xml";
     cout << svm_ER2Phase << endl;
-    TextRecognition image_reader;
+    TextRecognition<ERTextDetection, AbstractOCR> image_reader;
     image_reader.setShowingLetters( display_letters );
     image_reader.setShowingWords( display_words );
     try 
     {
         Dictionary dictionary(dict);
-        image_reader.loadConfiguration( boost_ER1Phase, svm_ER2Phase, svm_merge );
-        unique_ptr<MyOCR> ocr( new MyOCR(ocr_conf) );
+        // image_reader.loadConfiguration( boost_ER1Phase, svm_ER2Phase, svm_merge );
+        image_reader.constructExtractionMethod( boost_ER1Phase, svm_ER2Phase);
+        image_reader.loadEquivConfiguration(svm_merge);
+        // unique_ptr<MyOCR> ocr( new MyOCR(ocr_conf) );
+        unique_ptr<AbstractOCR> ocr( new HogRBFOcr(ocr_conf) );
         image_reader.loadOcr( ocr.get() );
         
         for ( const std::string &file_path : input )

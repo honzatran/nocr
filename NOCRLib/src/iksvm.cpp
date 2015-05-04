@@ -763,6 +763,12 @@ double IKSVM::predict( const std::vector<double> &x )
     std::vector<double> decision_values;
     return computeDecisionsValue(x, decision_values );
 }
+         
+std::vector<double> IKSVM::predictMultiple(const std::vector<double> &x)
+{
+    std::vector<double> decision_values;
+    return computeDecisionsValueMult(x, decision_values);
+}
 
 double IKSVM::computeDecisionsValue( const std::vector<double> &x, 
         std::vector<double> &decision_values )
@@ -800,6 +806,60 @@ double IKSVM::computeDecisionsValue( const std::vector<double> &x,
     return labels_[max_idx];
 }
 
+std::vector<double> IKSVM::computeDecisionsValueMult(const std::vector<double> & descriptors,
+        std::vector<double> & decision_values)
+{
+    std::size_t count = descriptors.size()/features_dim_;
+    std::size_t num_classifiers = nr_class_ * (nr_class_ - 1 ) / 2;
+
+    decision_values.resize(count * num_classifiers);
+    vector<int> votes(count * nr_class_, 0);
+
+    int p = 0;
+    for ( int i = 0; i < nr_class_; ++i ) 
+    {
+        for ( int j = i + 1; j < nr_class_; ++j )
+        {
+            for (std::size_t k = 0; k < count; ++k)
+            {
+                double decision_value = evalDecisionFunction(p, descriptors, k * features_dim_);
+                decision_values[k * num_classifiers + p] = decision_value;
+
+                if ( decision_value > 0 )
+                {
+                    votes[k * nr_class_ + i] += 1;
+                }
+                else 
+                {
+                    votes[k * nr_class_ + j] += 1;
+                }
+            } 
+
+            ++p;
+        }
+    }
+
+    vector<double> results(count);
+
+    std::size_t offset = 0;
+    for (std::size_t k = 0; k < count; ++k)
+    {
+        std::size_t max_idx = 0;
+        for (std::size_t i = 1; i < nr_class_; ++i)
+        {
+            if (votes[offset + max_idx] < votes[offset + i])
+            {
+                max_idx = i;
+            }
+        }
+
+        results[k] = labels_[max_idx];
+        offset += nr_class_;
+    }
+
+    return results;
+}
+
 double IKSVM::evalDecisionFunction(std::size_t indx, const std::vector<double> & x)
 {
     double value = decision_values_b_[indx];
@@ -813,6 +873,39 @@ double IKSVM::evalDecisionFunction(std::size_t indx, const std::vector<double> &
         std::tie(step_size, min_sample) = decision_function_info_[indx * features_dim_ + i];
 
         double f_interpolation = (x[i] - min_sample)/step_size;
+
+        int left = std::floor(f_interpolation);
+        int right = left + 1;
+
+        left = std::min(left, num_steps);
+        left = left > 0 ? left : 0;
+        right = std::min(right, num_steps);
+        right = right > 0 ? right : 0;
+
+        std::size_t dec_fn_indx = (indx * features_dim_ + i) * approx_count_;
+        double alpha = f_interpolation - left;
+        double f_left = decision_function_[dec_fn_indx + left];
+        double f_right = decision_function_[dec_fn_indx + right];
+
+        value += ( 1 - alpha ) * f_left + alpha * f_right;
+    }
+
+    return value;
+}
+
+double IKSVM::evalDecisionFunction(std::size_t indx, const std::vector<double> & x, std::size_t offset)
+{
+    double value = decision_values_b_[indx];
+    //tady pujde sse
+    int num_steps = approx_count_ - 1;
+    for ( size_t i = 0; i < features_dim_; ++i )
+    {
+        // double tmp1 =  approximated_functions_[i].getValueAt(x[i]);
+        // jsem se presune kod z ApproxFunction::compute
+        double step_size, min_sample;
+        std::tie(step_size, min_sample) = decision_function_info_[indx * features_dim_ + i];
+
+        double f_interpolation = (x[i + offset] - min_sample)/step_size;
 
         int left = std::floor(f_interpolation);
         int right = left + 1;
@@ -870,6 +963,60 @@ std::pair<double, std::vector<double> > IKSVM::predictProbability
     }
     delete [] pairwise_prob;
     return std::make_pair( label, prob_estimates );
+}
+
+
+std::pair< std::vector<double>, std::vector<double> > IKSVM::predictProbabilityMultiple
+                                        ( const std::vector<double> &x )
+{
+    double **pairwise_prob = new double*[nr_class_];
+    for ( int i = 0; i < nr_class_; ++i )
+    {
+        pairwise_prob[i] = new double[nr_class_];
+    }
+
+    std::size_t count = x.size()/features_dim_;
+    vector<double> decision_values; 
+    computeDecisionsValueMult( x, decision_values ); 
+     
+    std::vector<double> prob_estimates( count * nr_class_, 0 );
+    std::size_t num_classifiers = nr_class_ *(nr_class_ - 1)/2;
+
+    std::vector<double> results(count, 0);
+
+    static double min_prob = 1e-7;
+    for (std::size_t k = 0; k < count; ++k)
+    {
+        int p = 0;
+        for ( int i = 0; i < nr_class_; ++i )
+        {
+            for ( int j = i + 1; j < nr_class_; ++j )
+            {
+                double sigmoid_predict_value = sigmoid_predict(decision_values[k * num_classifiers + p], 
+                        prob_A_[p], prob_B_[p] );
+                double prob = std::min( std::max(sigmoid_predict_value, min_prob), 1 - min_prob );
+                pairwise_prob[i][j] = prob;
+                pairwise_prob[j][i] = 1 - prob;
+                ++p;
+            }
+        }
+
+        int indx = k * nr_class_;
+        multiclass_probability( nr_class_, pairwise_prob, &prob_estimates[indx]);
+        auto it = prob_estimates.begin() + indx;
+
+        auto max_it = std::max_element( it, it + nr_class_);
+        results[k] = labels_[ max_it - it];
+    }
+
+
+    for ( int i = 0; i < nr_class_; ++i )
+    {
+        delete [] pairwise_prob[i];
+    }
+    delete [] pairwise_prob;
+
+    return std::make_pair( results, prob_estimates );
 }
 
 

@@ -58,6 +58,7 @@ set ( SOURCES
     ./src/swt_segmentation.cpp
     ./src/street_view_scene.cpp
     ./src/ground_truth_impl.cpp
+    ./src/word_deformation.cpp
     )
     
 add_library( NOCRLib SHARED ${HEADERS} ${SOURCES} )

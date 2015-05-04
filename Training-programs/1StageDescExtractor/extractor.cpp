@@ -18,35 +18,40 @@ TruePositiveExtractor ::loadXml(const std::string & xml_file)
     for(pugi::xml_node img_node : gt_train.children("image"))
     {
         string img_name = getFileName(img_node.child("image-path").child_value());
-        pugi::xml_node gt_letters = img_node.child("image-gt").child("gt-letters");
-
         vector<LetterRecord> letters;
-        for (pugi::xml_node letter : gt_letters.children())
+        auto gt = img_node.child("image-gt");
+
+        for (pugi::xml_node word_node : gt.children("word"))
         {
-            char c = letter.child_value()[0];
-            int b = letter.attribute("b").as_int();
-            int g = letter.attribute("g").as_int();
-            int r = letter.attribute("r").as_int();
+            for (pugi::xml_node letter : word_node.children())
+            {
+                char c = letter.child_value()[0];
+                int b = letter.attribute("b").as_int();
+                int g = letter.attribute("g").as_int();
+                int r = letter.attribute("r").as_int();
 
-            cv::Point center;
-            center.x = letter.attribute("center-x").as_int();
-            center.y = letter.attribute("center-y").as_int();
+                cv::Point center;
+                center.x = letter.attribute("center-x").as_int();
+                center.y = letter.attribute("center-y").as_int();
 
-            cv::Point tl, br;
-            tl.x = letter.attribute("tl-x").as_int();
-            tl.y = letter.attribute("tl-y").as_int();
+                cv::Point tl, br;
+                tl.x = letter.attribute("tl-x").as_int();
+                tl.y = letter.attribute("tl-y").as_int();
 
-            br.x = letter.attribute("br-x").as_int();
-            br.y = letter.attribute("br-y").as_int();
+                br.x = letter.attribute("br-x").as_int();
+                br.y = letter.attribute("br-y").as_int();
 
-            cv::Vec3b color;
-            color[0] = b;
-            color[1] = g;
-            color[2] = r;
+                cv::Vec3b color;
+                color[0] = b;
+                color[1] = g;
+                color[2] = r;
 
-            cv::Rect rect(tl, br);
-            letters.push_back({ color, rect, center, c});
+                cv::Rect rect(tl, br);
+                letters.push_back({ color, rect, center, c});
+            }
         }
+
+
 
         gt_records_.insert(std::make_pair(img_name, letters));
     }

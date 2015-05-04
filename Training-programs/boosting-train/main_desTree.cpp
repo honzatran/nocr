@@ -44,6 +44,7 @@ int main( int argc, char** argv )
     const std::string er_geom1 = "ergeom-1";
     const std::string swt = "swt";
     const std::string hog = "hogOcr";
+    const std::string dc = "dc-cost";
 
     CvBoostParams params;
     params.boost_type = CvBoost::REAL;
@@ -62,6 +63,7 @@ int main( int argc, char** argv )
         (er_geom1.c_str(), "generate second er geom phase descriptors")
         (swt.c_str(), "generate swt filtering phase descriptors")
         (hog.c_str(), "generate hog ocr descriptors")
+        (dc.c_str(), "generate train dc descriptors")
         ("weak-count", po::value<int>(&params.weak_count), "number of weak classifiers")
         ("max-depth", po::value<int>(&params.max_depth), "max depth of weak classifiers");
 
@@ -108,6 +110,12 @@ int main( int argc, char** argv )
     if (vm.count(hog.c_str()))
     {
         trainBoosting<feature::hogOcr>(params, input, output);
+        return 0;
+    }
+
+    if (vm.count(dc.c_str()))
+    {
+        trainBoosting<feature::DCDescriptor>(params, input, output);
         return 0;
     }
 }

@@ -17,6 +17,8 @@
 #include <nocrlib/utilities.h>
 #include <nocrlib/structures.h>
 #include <nocrlib/street_view_scene.h>
+#include <nocrlib/word_deformation.h>
+#include <nocrlib/knn_ocr.h>
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/core/core.hpp>
@@ -24,16 +26,19 @@
 #include <boost/program_options.hpp>
 
 #define SIZE 1024
+#define WORD_GENERATOR 0
+#define IKSVM_OCR 0
 
 using namespace std;
 
 string er1_conf_file = "../boost_er1stage_handpicked.xml";
 // const string er2_conf_file = "conf/svmERGeom.conf";
-string er2_conf_file = "../scaled_svmEr2.xml";
+string er2_conf_file = "../scaled_svmEr2_handpicked.xml";
 
 string icdar_test = "";
 string svt = "";
 string image_dir = "";
+string xml_file = "";
 
 
 int parseCmd(int argc, char ** argv)
@@ -44,9 +49,10 @@ int parseCmd(int argc, char ** argv)
     desc.add_options()
         ("help,h","display help message")
         ("er1-conf-file", po::value<string>(&er2_conf_file),"path to er 1 stage Boosting conf")
-        ("er2_conf-file", po::value<string>(&er2_conf_file),"path to er 2 stage SVM conf")
+        ("er2-conf-file", po::value<string>(&er2_conf_file),"path to er 2 stage SVM conf")
         ("test,t", po::value<string>(&icdar_test),"list of ICDAR test samples")
-        ("directory,d", po::value<string>(&image_dir), "path to output directory");
+        ("directory,d", po::value<string>(&image_dir), "path to output directory")
+        ("xml,x", po::value<string>(&xml_file), "enable xml evaluation output");
     
     try 
     {
@@ -75,20 +81,26 @@ int parseCmd(int argc, char ** argv)
 template <typename T, typename DRAWER> 
 void drawAndSave( const std::vector<T> &objects, 
         const cv::Mat &image,
-        DRAWER &drawer, const std::string & file_name)
+        DRAWER &drawer, const std::string & file_name,
+        const std::vector<bool> & results)
 {
     drawer.init(image);
-    for ( const auto &o : objects )
+
+    for (std::size_t i = 0; i < objects.size(); ++i) 
     {
-        drawer.draw(o.visual_information_);
+        cv::Scalar color = results[i] ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255);
+
+        drawer.setColor(color);
+        drawer.draw(objects[i].visual_information_);
     }
+
     ImageSaver saver;
     saver.saveImage(image_dir + '/' + file_name, drawer.getImage());
 }
 
-template <typename M>
+template <typename M, typename OCR>
 std::vector<TranslatedWord> runTest(
-        Segment<M> & segmentation,
+        Segment<M, OCR> & segmentation,
         Testing & testing,
         const LetterWordEquiv & word_equiv,
         const Dictionary & dict, 
@@ -98,11 +110,28 @@ std::vector<TranslatedWord> runTest(
     auto words = recognizeWords(segmentation, word_equiv, 
             dict, image);
 
-    testing.updateScores( file_name, words );
+    auto results = testing.updateScores( file_name, words );
+    
+
+#if WORD_GENERATOR
+    WordDeformation word_deformation;
+    word_deformation. setImage(image);
+    for (std::size_t i = 0; i < words.size(); ++i) 
+    {
+        auto desc = word_deformation.getDescriptor(words[i].visual_information_);        
+        for (float f  : desc)
+        {
+            std::cout << f << " ";
+        }
+        std::cout << std::endl;
+    }
+
+#endif
+
     if (!image_dir.empty())
     {
         RectangleDrawer drawer;
-        drawAndSave(words, image, drawer, file_name);
+        drawAndSave(words, image, drawer, file_name, results);
     }
 
     return words;
@@ -114,9 +143,20 @@ int main( int argc, char **argv )
 {
     parseCmd(argc, argv);
     
-    const string ocr_conf = "../conf/iksvm.conf";
+    // const string ocr_conf = "../conf/iksvm.conf";
     const string dict = "../conf/dict";
     const string merge_conf = "../conf/svmMerge.conf";
+
+#if IKSVM_OCR
+    const std::string ocr_conf = "../conf/iksvm.conf";
+    unique_ptr<MyOCR> ocr( new MyOCR(ocr_conf) );
+    Segment<ERTextDetection, MyOCR> er_text_segment;
+
+#else
+    const std::string ocr_conf = "../training/svm_hog.xml";
+    unique_ptr<AbstractOCR> ocr( new HogRBFOcr(ocr_conf) );
+    Segment<ERTextDetection, AbstractOCR> er_text_segment;
+#endif
 
     // const string er1_conf_file = "conf/boostGeom.conf";
 
@@ -127,7 +167,6 @@ int main( int argc, char **argv )
     //
     // segmentation.loadMethod( &detection_method );
 
-    std::unique_ptr<MyOCR> ocr( new MyOCR( ocr_conf ));
     //
     // segmentation.loadOcr( ocr.get() );
 
@@ -140,7 +179,6 @@ int main( int argc, char **argv )
     auto decider = std::make_shared<TruePositiveTest>();
     // mser_testing.setTruePositiveDecider(decider.get());
 
-    Segment<ERTextDetection> er_text_segment;
     ERTextDetection er_text_detection( er1_conf_file, er2_conf_file );
     er_text_segment.loadMethod(&er_text_detection);
     er_text_segment.loadOcr( ocr.get() );
@@ -184,6 +222,20 @@ int main( int argc, char **argv )
     // mser_testing.makeRecord( cout );
     cout << "ER results:" << endl;
     er_testing.makeRecord( cout );
+    if (xml_file.empty())
+    {
+        er_testing.printXmlOutput(cout);
+    }
+    else
+    {
+        std::ofstream ofs(xml_file);
+        er_testing.printXmlOutput(ofs);
+        ofs.close();
+
+        EvaluationDrawer eval_drawer;
+        eval_drawer.loadXml(xml_file);
+    }
+
     
     return 0;
 }

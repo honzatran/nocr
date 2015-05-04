@@ -190,6 +190,16 @@ class IKSVM
          */
         double predict( const std::vector<double> &x );
 
+        
+        /**
+         * @brief predict class for all descriptors in x
+         *
+         * @param x vector matrix[count descriptors, descriptor dimension]
+         *
+         * @return vector of labels 
+         */
+        std::vector<double> predictMultiple(const std::vector<double> & x);
+
         /**
          * @brief predict class for descriptor x and its probability outputs
          *
@@ -198,6 +208,10 @@ class IKSVM
          * @return label of predicted class and vector of probabilities for all classes
          */
         std::pair<double, std::vector<double> > predictProbability( const std::vector<double> &x );
+
+        std::pair<std::vector<double>, std::vector<double> > predictProbabilityMultiple( const std::vector<double> &x );
+
+        int getNumberOfClasses() const { return nr_class_; }
     private:
         IKSVM( int nr_class, int features_dim, int approx_count,
                const std::vector<double> prob_A, const std::vector<double> prob_B,
@@ -227,9 +241,13 @@ class IKSVM
         double computeDecisionsValue( const std::vector<double> &x, 
                 std::vector<double> &decision_values );
 
+        std::vector<double> computeDecisionsValueMult(const std::vector<double> & x,
+                std::vector<double> & decision_values);
+
         double evalDecisionFunction(std::size_t indx, const std::vector<double> & x); 
 
-
+        double evalDecisionFunction(std::size_t indx, const std::vector<double> & x, std::size_t offset);
+        
 
         const static std::string number_class_text;
         const static std::string feature_dimension_text;

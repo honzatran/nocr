@@ -30,6 +30,7 @@ set (BIN_OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${TRAIN_BIN})
 
 add_subdirectory( ./Er1Stage)
+add_subdirectory( ./word-generator)
 
 set (${CMAKE_RUNTIME_OUTPUT_DIRECTORY} ${BIN_OUTPUT})
 

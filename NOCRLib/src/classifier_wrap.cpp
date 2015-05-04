@@ -8,7 +8,6 @@
 #include "../include/nocrlib/classifier_wrap.h"
 
 #include <libsvm/svm.h>
-#include <liblinear/linear.h>
 
 #include <opencv2/core/core.hpp>
 
@@ -487,60 +486,60 @@ void LibSVMTrainBridge::destroy_svm_model(svm_model ** model)
 
 // =================================================================
 
-model* LibLINEARTrainBridge::trainModel( const cv::Mat &train_data, const cv::Mat &labels, 
-        parameter *params)
-{
-    problem linear_problem = constructProblem( train_data, labels ); 
-    std::cout << "start training" << std::endl;
-    
-    cout << linear_problem.l << endl;
-    model *linear_model = train( &linear_problem , params );
-
-    std::cout << "delete done" << std::endl;
-    delete[] linear_problem.y;
-    for ( int i = 0; i < train_data.rows; ++i )
-    {
-        delete[] linear_problem.x[i];
-    }
-    delete[] linear_problem.x;
-
-    return linear_model;
-}
-
-problem LibLINEARTrainBridge::constructProblem
-    ( const cv::Mat &train_data, const cv::Mat &labels ) const
-{
-    problem linear_problem;
-    linear_problem.l = train_data.rows;
-    linear_problem.n = train_data.cols;
-    linear_problem.bias = -1;
-    linear_problem.y = new double[train_data.rows]; 
-    linear_problem.x = new feature_node*[train_data.rows];
-    for ( int i = 0; i < train_data.rows; ++i )
-    {
-        linear_problem.y[i] = labels.at<float>(i,0);
-        linear_problem.x[i] = new feature_node[train_data.cols+1];
-        for ( int j = 0; j < train_data.cols; ++j )
-        {
-            linear_problem.x[i][j] = { j + 1, train_data.at<float>(i,j) }; 
-        }
-        linear_problem.x[i][train_data.cols] = { -1 , 25 };
-    }
-
-    return linear_problem;
-}
-
-feature_node* LibLINEARTrainBridge::constructSample( const std::vector<float> &data ) const
-{
-    feature_node *sample = new feature_node[data.size()+1];
-    for ( size_t i = 0; i < data.size(); ++i )
-    {
-        sample[i].index = i+1;
-        sample[i].value = data[i];
-    }
-    sample[data.size()].index = -1;
-    return sample;
-}
+// model* LibLINEARTrainBridge::trainModel( const cv::Mat &train_data, const cv::Mat &labels, 
+//         parameter *params)
+// {
+//     problem linear_problem = constructProblem( train_data, labels ); 
+//     std::cout << "start training" << std::endl;
+//     
+//     cout << linear_problem.l << endl;
+//     model *linear_model = train( &linear_problem , params );
+//
+//     std::cout << "delete done" << std::endl;
+//     delete[] linear_problem.y;
+//     for ( int i = 0; i < train_data.rows; ++i )
+//     {
+//         delete[] linear_problem.x[i];
+//     }
+//     delete[] linear_problem.x;
+//
+//     return linear_model;
+// }
+//
+// problem LibLINEARTrainBridge::constructProblem
+//     ( const cv::Mat &train_data, const cv::Mat &labels ) const
+// {
+//     problem linear_problem;
+//     linear_problem.l = train_data.rows;
+//     linear_problem.n = train_data.cols;
+//     linear_problem.bias = -1;
+//     linear_problem.y = new double[train_data.rows]; 
+//     linear_problem.x = new feature_node*[train_data.rows];
+//     for ( int i = 0; i < train_data.rows; ++i )
+//     {
+//         linear_problem.y[i] = labels.at<float>(i,0);
+//         linear_problem.x[i] = new feature_node[train_data.cols+1];
+//         for ( int j = 0; j < train_data.cols; ++j )
+//         {
+//             linear_problem.x[i][j] = { j + 1, train_data.at<float>(i,j) }; 
+//         }
+//         linear_problem.x[i][train_data.cols] = { -1 , 25 };
+//     }
+//
+//     return linear_problem;
+// }
+//
+// feature_node* LibLINEARTrainBridge::constructSample( const std::vector<float> &data ) const
+// {
+//     feature_node *sample = new feature_node[data.size()+1];
+//     for ( size_t i = 0; i < data.size(); ++i )
+//     {
+//         sample[i].index = i+1;
+//         sample[i].value = data[i];
+//     }
+//     sample[data.size()].index = -1;
+//     return sample;
+// }
 
 // void SVM::train( const std::string &data_file, svm_parameter *param )
 // {

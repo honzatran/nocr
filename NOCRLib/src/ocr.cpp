@@ -32,3 +32,36 @@ char MyOCR::translate( Component &c, std::vector<double> &probabilities )
     return alpha[index_letter];
 }
 
+std::vector<char> MyOCR::translate( const std::vector<std::shared_ptr<Component> > & comp_ptrs, 
+        std::vector<double> & probabilities)
+{
+    vector<double> features;
+
+    for (const auto & c_ptr : comp_ptrs)
+    {
+        auto tmp = hog_->compute(c_ptr);
+        features.insert(features.end(), tmp.begin(), tmp.end());
+    }
+
+    std::vector<double> labels;
+    std::tie(labels, probabilities) = iksvm_.predictProbabilityMultiple(features);
+
+    std::vector<char> characters;
+    characters.reserve(labels.size());
+
+    for (int l : labels)
+    {
+        characters.push_back(alpha[l]);
+    }
+
+    return characters;
+}
+
+char HogRBFOcr::translate(Component & c, std::vector<double> & probabilities)
+{
+    vector<float> features = hog_->compute( c );
+    int index_letter = svm_->predictProbabilities(features, probabilities);
+
+    return alpha[index_letter];
+}
+

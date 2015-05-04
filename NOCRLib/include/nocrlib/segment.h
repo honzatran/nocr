@@ -76,6 +76,13 @@ template <typename S> class SegmentationPolicy
      */
 };
 
+template <typename OCR, typename T>
+struct SegmentOCRPolicy
+{
+    static std::vector<TranslationInfo> translate(OCR * ocr, 
+            const std::vector<T> & objects);
+};
+
 /**
  * @brief creates mask for vector of letters using non max suppresion described in
  * programming documentation
@@ -112,7 +119,7 @@ class MaskCreator
  *
  * @tparam T type of class used for segmentation
  */
-template <typename T> class Segment 
+template <typename T, typename OCR> class Segment 
 {
     public:
         typedef typename SegmentationPolicy<T>::MethodOutput MethodOutput; 
@@ -138,7 +145,7 @@ template <typename T> class Segment
          *
          * @param ocr
          */
-        void loadOcr( AbstractOCR *ocr )
+        void loadOcr(OCR *ocr)
         {
             ocr_ = ocr;
         }
@@ -181,7 +188,7 @@ template <typename T> class Segment
             }
 
             // no nonmax suppresion performed, return all candidates
-            std::vector<TranslationInfo> translations = translate(letter_candidates);
+            std::vector<TranslationInfo> translations = SegmentOCRPolicy<OCR, MethodOutput>::translate(ocr_, letter_candidates);
             // every letter candidate is extracted because mask is set true for all 
             // of them, this means that we consider all of them to be maximal.
             std::vector<bool> mask( letter_candidates.size(), true );
@@ -190,8 +197,8 @@ template <typename T> class Segment
 
     private:
         T *method_ptr_;
-        AbstractOCR *ocr_;
         VisualConvertor visual_convertor_;
+        OCR * ocr_;
 
 
 
@@ -202,8 +209,9 @@ template <typename T> class Segment
                 std::chrono::milliseconds>  tC;
             auto begin = std::chrono::steady_clock::now();
 #endif
-            std::vector<TranslationInfo> translations = 
-                translate( objects );
+            // std::vector<TranslationInfo> translations = translate( objects );
+            std::vector<TranslationInfo> translations = SegmentOCRPolicy<OCR, MethodOutput>::translate(ocr_,
+                    objects);
 #if PRINT_TIME
             auto end = std::chrono::steady_clock::now();
             std::cout << "ocr phase takes: " << tC(begin,end).count() 

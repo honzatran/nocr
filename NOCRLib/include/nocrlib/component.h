@@ -203,10 +203,10 @@ class Component
          *
          * @return centroid of component
          */
-        cv::Point2d centroid() const 
+        cv::Point centroid() const 
         {
             int size = points_.size();
-            return cv::Point2d( (double)sumX_/size, (double)sumY_/size );
+            return cv::Point( sumX_/size, sumY_/size );
         }
 
         /**

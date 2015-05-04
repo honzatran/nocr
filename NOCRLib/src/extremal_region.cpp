@@ -377,13 +377,9 @@ vector< LetterStorage<ERStat> > ERTree::getLetters( bool deallocate )
     
 #ifdef PRINT_INFO
     std::cout << "first stage " << root_->getNodeCount() << endl;
-    std::cout << sizeof(cv::Vec4i) << std::endl;
 #endif
      
-    transform([this] (NodeType * node) -> bool
-            {
-                return filter2_.isLetter(node->getVal());
-            }, root_);
+    transform2StageFiltering();
 
 
 #ifdef PRINT_INFO
@@ -484,6 +480,14 @@ void ERTree::transformExtreme()
     transform([this] (NodeType * node) -> bool
             {
                 return isExtremeRegion(node);
+            }, root_);
+}
+
+void ERTree::transform2StageFiltering()
+{
+    transform([this] (NodeType * node) -> bool
+            {
+                return filter2_.isLetter(node->getVal());
             }, root_);
 }
 
@@ -653,14 +657,8 @@ ERTextDetection::ERTextDetection
     // ocr_( std::move(ocr) )
 {
     // knn_ocr_.loadTrainData( "distHistogramTrain" );
-    double min_area_ratio = 0.00003;
-    double max_area_ratio = 0.1;
-
-   
-    extremal_region_.setMinAreaRatio(min_area_ratio);
-    extremal_region_.setMaxAreaRatio(max_area_ratio);
     extremal_region_.loadSecondStageConf( second_stage_conf );
-    extremal_region_.setDelta(2);
+    extremal_region_.setDelta(8);
 
     std::unique_ptr<ERFilter1Stage> er_function( new ERFilter1Stage() );
     er_function->loadConfiguration( first_stage_conf );
@@ -709,27 +707,27 @@ std::pair<double, double> ErLimitSize::getErSizeLimits(const cv::Size & size)
     double max_area_ratio = 0.1;
     if (size.area() <= 640 * 480)
     {
-        min_area_ratio = 0.00005;
+        min_area_ratio = 0.00007;
         max_area_ratio = 0.4;
     }
     else if (size.area() <= 1024* 768)
     {
-        min_area_ratio = 0.000035;
+        min_area_ratio = 0.00007;
         max_area_ratio = 0.3;
     }
     else if (size.area() <= 1280 * 1024)
     {
-        min_area_ratio = 0.00003;
+        min_area_ratio = 0.00005;
         max_area_ratio = 0.1;
     }
     else if (size.area() <= 1600 * 1200)
     {
-        min_area_ratio = 0.00003;
+        min_area_ratio = 0.00004;
         max_area_ratio = 0.1;
     }
     else
     {
-        min_area_ratio = 0.00002;
+        min_area_ratio = 0.000027;
         max_area_ratio = 0.05;
     }
 

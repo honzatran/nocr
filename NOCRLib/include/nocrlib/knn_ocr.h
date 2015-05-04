@@ -42,6 +42,8 @@ class KNNOcr : public AbstractOCR
             dir_hist_ = factory.createFeatureExtractor();
         }
 
+        KNNOcr(const std::string & train_data_file);
+
         /**
          * @brief forrbiden copy constructor
          *

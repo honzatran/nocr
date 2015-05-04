@@ -419,10 +419,13 @@ class Resizer
         double  last_scale_;
 };
 
+inline double angle(cv::Point a, cv::Point b, cv::Point c)
+{
+    cv::Point v1 = a - b;
+    cv::Point v2 = c - b;
 
-
-
-
+    return std::acos(v1.ddot(v2)/(cv::norm(v1) * cv::norm(v2)));
+}
 
 /// @endcond
 

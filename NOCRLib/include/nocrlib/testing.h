@@ -27,6 +27,8 @@
 
 #include <opencv2/core/core.hpp>
 
+#include <pugi/pugixml.hpp>
+
 #include "structures.h"
 
 
@@ -56,7 +58,7 @@ class ImageGroundTruth
          * @param word new word
          *
          * @return rectangle of word in image, empty rectangle 
-         * if words isn't on image
+         * if image doesn't contain word
          */
         cv::Rect getRectangle( const std::string &word );
 
@@ -80,9 +82,19 @@ class ImageGroundTruth
                 TruePositiveInterface * tp_ptr);
 
     private:
-        std::multimap< std::string, cv::Rect > records_; 
+        struct WordRecord
+        {
+            std::string word;
+            std::vector<int> labels;
+            cv::Rect bbox;
+        };
+
+
+        // std::multimap< std::string, cv::Rect > records_; 
+        std::vector< WordRecord > records_;
         decltype(records_)::const_iterator 
             findContainingRecord(const cv::Rect &rect) const;
+
 };
 
 /**
@@ -187,7 +199,7 @@ class Testing
          * @param image name of image, words have been recognized from
          * @param detected_words detected words from recognition
          */
-        void updateScores( const std::string &image, 
+        std::vector<bool> updateScores( const std::string &image, 
                 const std::vector<TranslatedWord> &detected_words );
 
         /**
@@ -212,8 +224,13 @@ class Testing
 
         void notifyResize(const std::string & name, double scale);
 
+        void printXmlOutput(std::ostream &oss) const;
+
     private:
         std::map<std::string, ImageGroundTruth> ground_truth_;
+
+        pugi::xml_document doc_;
+        pugi::xml_node root_;
 
         TruePositiveInterface * decider_ptr_;
 
@@ -223,6 +240,50 @@ class Testing
 
         void updatePositiveScore( const cv::Rect &test_bound_box, 
                 const cv::Rect & detected_bound_box );
+
+        void createWordNode(pugi::xml_node & word_node, const TranslatedWord & word);
+};
+
+class EvaluationDrawer
+{
+    public:
+        EvaluationDrawer() = default;
+
+        void loadXml(const pugi::xml_document & doc);
+
+        void loadXml(const std::string & xml_file);
+
+    private:
+        struct LetterRecord
+        {
+            cv::Rect bbox;
+            char character;
+            double confidence;
+
+            LetterRecord() = default;
+
+            LetterRecord(const cv::Rect & _bbox, char _character, double _confidence)
+                : bbox(_bbox), character(_character), confidence(_confidence) { }
+        };
+
+        struct WordRecord 
+        {
+            cv::Rect word_bbox;
+            std::vector<LetterRecord> letters_records;
+            bool ground_truth;
+
+            WordRecord() = default;
+
+            WordRecord(const cv::Rect & _word_bbox, 
+                    const std::vector<LetterRecord> & _letters_records, bool _ground_truth) 
+                : word_bbox(_word_bbox), letters_records(_letters_records), ground_truth(_ground_truth)
+            {
+            }
+        };
+
+        std::map<std::string, std::vector<WordRecord> > detection_results_;
+
+        std::vector<LetterRecord> getLetterRecords(const pugi::xml_node & word_node);
 };
 
 struct LetterGT

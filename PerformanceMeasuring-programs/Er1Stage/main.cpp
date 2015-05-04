@@ -13,8 +13,10 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/core/core.hpp> 
 
-#include "measure_task.hpp"
+#include "../common/measure_task.hpp"
 
+#define BOOST_CONF "../boost_er1stage_handpicked.xml"
+#define SVM_CONF "../scaled_svmEr2_handpicked.xml"
 
 void buildTree(ERTree & er_tree, 
         ComponentTreeBuilder<ERTree> & builder)
@@ -25,6 +27,30 @@ void buildTree(ERTree & er_tree,
 }
 
 using namespace std;
+
+struct ErTreeBuildTask
+{
+    ErTreeBuildTask();
+
+    void run(const std::vector<cv::Mat> & data);
+};
+
+ErTreeBuildTask::ErTreeBuildTask()
+{
+}
+
+void ErTreeBuildTask::run(const std::vector<cv::Mat> & data)
+{
+    ERTextDetection detection(BOOST_CONF, SVM_CONF);
+    for (const auto & image : data)
+    {
+        detection.getLetters(image);
+    }
+}
+
+//=========================================
+
+
 
 int main(int argc, char ** argv)
 {
@@ -39,10 +65,11 @@ int main(int argc, char ** argv)
         images.push_back(image);
     }
 
-    MeasureTask<ErTreeBuildTask, vector<cv::Mat>, 100> measuring;
+    std::cout << "start extracting" << std::endl;
+
+    MeasureTask<ErTreeBuildTask, 1, vector<cv::Mat> > measuring;
     cout << measuring.measureWallClockTime(task, images) 
         << " ms" << endl;
-
 
     /*
      * ERTree er_tree(min_area_ratio, max_area_ratio);

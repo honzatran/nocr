@@ -28,7 +28,7 @@ public:
         const std::string & er_first_stage, const std::string &er_second_stage,
                             const std::string & merge_confs );
 
-    void loadOcr( std::unique_ptr<AbstractOCR> ocr );
+    void loadOcr(std::unique_ptr<AbstractOCR> ocr);
     cv::Mat getImage();
     std::vector<TranslatedWord> getWords();
 
@@ -51,7 +51,7 @@ public slots:
 
 
 private:
-    TextRecognition text_recognition_;
+    TextRecognition<ERTextDetection, AbstractOCR> text_recognition_;
     cv::Mat image_;
     std::vector<TranslatedWord> words_;
     QVector<TranslationRecord> detected_words_;

@@ -33,7 +33,8 @@ int main( int argc, char** argv )
     const std::string er_geom = "ergeom";
     const std::string er_geom1 = "ergeom-1";
     const std::string swt = "swt";
-    const std::string hog = "hogOcr";
+    const std::string hog = "hog";
+    const std::string dist = "dir-hist";
 
     namespace po = boost::program_options;
     po::options_description desc("Usage");
@@ -44,7 +45,8 @@ int main( int argc, char** argv )
         (er_geom.c_str(), "generate first er geom phase descriptors")
         (er_geom1.c_str(), "generate second er geom phase descriptors")
         (swt.c_str(), "generate swt filtering phase descriptors")
-        (hog.c_str(), "generate hog ocr descriptors");
+        (hog.c_str(), "generate hog ocr descriptors")
+        (dist.c_str(), "generate direction historgram");
 
     po::variables_map vm;
 
@@ -91,5 +93,10 @@ int main( int argc, char** argv )
         return 0;
     }
 
+    if (vm.count(dist.c_str()))
+    {
+        generate<feature::DirectionHist>(input, output);
+        return 0;
+    }
 }
 

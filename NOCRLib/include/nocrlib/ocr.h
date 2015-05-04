@@ -19,6 +19,7 @@
 #include <string>
 #include <algorithm>
 #include <iostream>
+#include <memory>
 
 #include "component.h"
 #include "classifier_wrap.h"
@@ -88,7 +89,7 @@ class MyOCR : public AbstractOCR
          * @brief constructor, that initializes SVM
          *
          * @param conf_file path to config file for SVM
-         * 
+  w        * 
          * Constructor initializing SVM with fast intersection kernel 
          * using @p conf_file
          */
@@ -104,8 +105,47 @@ class MyOCR : public AbstractOCR
         }
 
         char translate( Component &c, std::vector<double> &probabilities ) override;
+
+        std::vector<char> translate(
+                const std::vector<std::shared_ptr<Component> > & comp_ptrs, 
+                std::vector<double> & probabilities) override;
+
+        int getNumberOfClasses() const { return iksvm_.getNumberOfClasses(); }
     private:
         IKSVM iksvm_;
+        std::unique_ptr<AbstractFeatureExtractor> hog_;
+};
+
+/**
+ * @brief OCR using HOG combined with SVM with fast intersection kernel 
+ * for charakter recognition
+ */
+class HogRBFOcr : public AbstractOCR
+{
+    public:
+        /**
+         * @brief constructor, that initializes SVM
+         *
+         * @param conf_file path to config file for SVM
+         * 
+         * Constructor initializing SVM with fast intersection kernel 
+         * using @p conf_file
+         */
+        HogRBFOcr( const std::string &conf_file )
+        {
+            if (!svm_)
+            {
+                svm_ = create<LibSVM, feature::hogOcr>();
+                svm_->loadConfiguration(conf_file);
+            }
+
+            HogFactory factory;
+            hog_ = factory.createFeatureExtractor();
+        }
+        
+        char translate( Component &c, std::vector<double> &probabilities ) override;
+    private:
+        std::shared_ptr< LibSVM<feature::hogOcr> > svm_;
         std::unique_ptr<AbstractFeatureExtractor> hog_;
 };
 

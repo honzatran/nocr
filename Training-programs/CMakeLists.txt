@@ -33,6 +33,7 @@ add_subdirectory( ./boosting-train)
 add_subdirectory( ./ErExtractor )
 add_subdirectory( ./GtExtractor)
 add_subdirectory( ./1StageDescExtractor)
+add_subdirectory( ./train-word-generator)
 
 set (${CMAKE_RUNTIME_OUTPUT_DIRECTORY} ${BIN_OUTPUT})
 

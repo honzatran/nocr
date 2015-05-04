@@ -14,14 +14,13 @@ set( NOCR_EXTERNAL_LIB ${NOCR_SOURCE_DIR}/lib )
 
 # include_directories( ${VLROOT_INCLUDE_DIR} )
 include_directories( ${NOCR_SOURCE_DIR}/External-libraries/libsvm-3.18/ )
-include_directories( ${NOCR_SOURCE_DIR}/External-libraries/liblinear-1.94/ )
 include_directories( ${NOCR_SOURCE_DIR}/External-libraries/pugixml/ )
 include_directories( ${Boost_INCLUDE_DIR})
 link_directories( ${Boost_LIBRARY_DIR})
 
     
 if (UNIX)
-    add_compile_options(-std=c++0x -Wall -ggdb -Wextra )
+    add_compile_options(-std=c++0x -Wall -ggdb -Wextra)
 endif(UNIX)
 
 add_subdirectory( ./External-libraries)
@@ -29,7 +28,6 @@ add_subdirectory( ./External-libraries)
 set (required_libraries 
         ${NOCR_EXTERNAL_LIB}/libpugi.so
         ${NOCR_EXTERNAL_LIB}/libLibSVM.so 
-        ${NOCR_EXTERNAL_LIB}/libLibLinear.so
         ${Boost_PROGRAM_OPTIONS_LIBRARY}
         ${Boost_SYSTEM_LIBRARY})
 
@@ -38,6 +36,7 @@ add_subdirectory( NOCRLib )
 include_directories( "${NOCR_SOURCE_DIR}/NOCRLib/include" )
 
 add_subdirectory( ./NOCRMain )
+add_subdirectory( ./NOCRGui)
 add_subdirectory( ./Experiments-programs)
 add_subdirectory( ./Training-programs)
 # add_subdirectory( ./PerformanceMeasuring-programs)

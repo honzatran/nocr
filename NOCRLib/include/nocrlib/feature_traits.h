@@ -22,7 +22,7 @@
 enum class feature 
 {
     geom, hogOcr, hogLongOcr ,momentsOcr, ERGeom, ERGeom1, MergeLetter, DSift, Sift, 
-    SiftBow, DirectionHist, DSiftBoW, SwtGeom1
+    SiftBow, DirectionHist, DSiftBoW, SwtGeom1, DCDescriptor
 };
 
 /**
@@ -48,6 +48,12 @@ struct FeatureTraits<feature::SiftBow>
 {
     static const int features_length = 245;
     typedef BoWFactory<SiftKeyPointDescriptor> FactoryType;
+};
+
+template <>
+struct FeatureTraits<feature::DCDescriptor>
+{
+    static const int features_length = 6;
 };
 
 /// @uncond

@@ -40,6 +40,36 @@ class AbstractOCR
          */
         virtual char translate( Component &c, std::vector<double> &probabilities ) = 0;
 
+        virtual std::vector<char> translate(std::vector<Component> & components, std::vector<double> & probabilities)
+        {
+            std::vector<double> tmp;
+            std::vector<char> letters;
+            letters.reserve(components.size());
+
+            for (auto & c : components)
+            {
+                letters.push_back(translate(c, tmp));
+                probabilities.insert(probabilities.end(), tmp.begin(), tmp.end());
+            }
+
+            return letters;
+        }
+
+        virtual std::vector<char> translate(const std::vector< std::shared_ptr<Component> > & components, std::vector<double> & probabilities)
+        {
+            std::vector<double> tmp;
+            std::vector<char> letters;
+            letters.reserve(components.size());
+
+            for (auto & c : components)
+            {
+                letters.push_back(translate(*c, tmp));
+                probabilities.insert(probabilities.end(), tmp.begin(), tmp.end());
+            }
+
+            return letters;
+        }
+
         /**
          * @brief set current image, where all following components will be extracted
          *
@@ -47,7 +77,7 @@ class AbstractOCR
          *
          * Set current image.
          */
-        virtual void setImage( const cv::Mat &image ) { (void)(image); };
+        virtual void setImage( const cv::Mat &image ) { UNUSED(image); };
 };
 
 #endif /* ocr_interface.h */

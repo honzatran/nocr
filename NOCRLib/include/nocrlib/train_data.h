@@ -15,6 +15,7 @@
 #include "abstract_feature.h"
 #include "iooper.h"
 #include "feature_traits.h"
+#include "direction_histogram.h"
 
 #include <memory>
 #include <vector>

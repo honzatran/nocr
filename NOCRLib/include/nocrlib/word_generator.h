@@ -15,6 +15,7 @@
 #include "ocr.h"
 #include "dictionary.h"
 #include "trie_node.h"
+#include "word_deformation.h"
 
 
 #include <vector>
@@ -22,6 +23,11 @@
 #include <tuple>
 #include <unordered_map>
 #include <ostream>
+
+
+#define WORD_GENERATOR_DEBUG 1
+
+
 
 /**
  * @brief WordGenerator encapsulates algorithm proposed by and co. This approach generates
@@ -55,7 +61,7 @@ class WordGenerator
          */
         /* ----------------------------------------------------------------------------*/
         WordGenerator( const VecLetter &letters, 
-                const LetterWordEquiv &equivalence );
+                const LetterWordEquiv &equivalence, const cv::Mat & image );
 
         // void initialize( const VecLetter &letters, const LetterWordEquiv &equivalence );
 
@@ -67,7 +73,8 @@ class WordGenerator
          *
          * Computes all neccesery information about letters in image for the algorithm
          */
-        void initHorizontalDetection( const VecLetter &letters, const LetterWordEquiv &equivalence );
+        void initHorizontalDetection( const VecLetter &letters, const LetterWordEquiv &equivalence, 
+                const cv::Mat & image );
 
         /**
          * @brief computes neccesery information for detection of vertical words
@@ -77,9 +84,9 @@ class WordGenerator
          *
          * Computes all neccesery information about letters in image for the algorithm
          */
-        void initVerticalDetection( const VecLetter &letters, const LetterWordEquiv &equivalence );
+        void initVerticalDetection( const VecLetter &letters, const LetterWordEquiv &equivalence,
+                const cv::Mat & image );
  
-        /* --------------------------------------------------------------------------*/
         /**
          * @brief return optimal configuration from letters for word
          *
@@ -91,10 +98,8 @@ class WordGenerator
          * and return geometric and visual information about it uses the 
          * algorithm from .
          */
-        /* ----------------------------------------------------------------------------*/
         Word findConfiguration( const std::string &word );
 
-        /* --------------------------------------------------------------------------*/
         /**
          * @brief return words, that are in the image 
          * and dictionary
@@ -106,7 +111,6 @@ class WordGenerator
          * Method computes, which words from dictionary are in input image.
          * Using the algorithm described in bachelor thesis from .
          */
-        /* ----------------------------------------------------------------------------*/
         std::vector<TranslatedWord> process( const Dictionary &dictionary );
 
         /**
@@ -122,6 +126,18 @@ class WordGenerator
     private:
 
         // private classes  ===============================================
+        //
+        struct EdgeWeights
+        {
+            double deformation_cost;
+            double space_dist;
+
+            EdgeWeights() : deformation_cost(0), space_dist(0) { }
+
+            EdgeWeights(double _deformation_cost, double _space_dist)
+                : deformation_cost(_deformation_cost), space_dist( _space_dist) { }
+        };
+
         struct WordRecord
         {
             WordRecord( const std::string &text, const std::vector<int> &indices )
@@ -160,40 +176,76 @@ class WordGenerator
             }
         };
 
+        class WordDescriptors
+        {
+        public:
+            /**
+             * @brief sums of pixel value [0, 1, 2] and sums of their squares [3, 4, 5]
+             */
+            cv::Vec3f color_sums;
+            cv::Vec3f color_sums_sqr;
+
+            float dist_sum, dist_sqr;
+            float height_sum, height_sqr;
+            float angle_sum, angle_sqr;
+            float angle;
+
+            int succesor;
+            std::size_t letters_count;
+
+            // centroid of first letter of word and the second one
+            cv::Point center1, center2;
+
+            void merge(const WordDescriptors & other, double space_dist);
+
+            std::vector<float> getDescriptor() const;
+            float getDistStDeviation() const;
+            float getAngleStdDeviation() const;
+        };
+
+
         // ============================= private members and methods
-        const double k_theta = 1.75;
+        const double k_theta = 0.9;
         const double k_epsilon = 0.9;
+        // const double k_theta = .0;
+        // const double k_epsilon = .0;
         const static int k_max_missing_letters = 3;
 
         int current_depth_;
 
         int max_length_;
+        int rows_, cols_;
+        cv::Mat image_;
 
-        template <typename T> using Matrix = std::vector< std::vector<T> >;
         VecLetter letters_;
 
         std::string text_;
         // empty_score_[i] = sum from 0 to i score(letters_[i], epsilon)
         std::vector<double> empty_score_;
-        // table to update
-        Matrix<double> optimal_score_;
-        // succesors 
-        Matrix<int> succesors_;
+        // Matrix<double> optimal_score_;
+        std::vector<double> optimal_score_;
+        // Matrix<int> succesors_;
+        // std::vector<int> succesors_;
+        std::vector<WordDescriptors> descriptors_informations_;
+
         // storing current maxima for the column
         std::vector<ScoreRecord> maxima_;
         // mask of used letters 
         std::vector<bool> used_letters_;
 
-        std::unordered_multimap<int, std::pair<int,double> > edges_;
+        std::vector<WordDescriptors> descriptor_prototypes_;
+
+        std::unordered_multimap<int, std::pair<int, EdgeWeights> > edges_;
         std::map<double,WordRecord> detected_words_;
 
         double computeDeformationCost( int i, int j );
 
         template <typename EdgeEval> 
-        void fillRelationTables(const LetterWordEquiv &equivalence, const EdgeEval &eval )
+        void fillRelationTables(const LetterWordEquiv &equivalence, EdgeEval && eval)
         {
             edges_.clear();
             detected_words_.clear();
+            UNUSED(equivalence);
 
             for ( size_t i = 0; i < letters_.size(); ++i ) 
             {
@@ -205,11 +257,20 @@ class WordGenerator
                         continue;
                     }
 
-                    if ( equivalence.areEquivalent( letters_[i], letters_[j] ) )
-                    // if ( true )
+                    // if ( equivalence.areEquivalent( letters_[i], letters_[j] ) )
+                    cv::Rect a_rect = letters_[i].getRectangle();
+                    cv::Rect b_rect = letters_[j].getRectangle();
+                    cv::Point a_centroid = letters_[i].getCentroid();
+                    cv::Point b_centroid = letters_[j].getCentroid();
+                    
+                    double height_ratio = 
+                        a_rect.height < b_rect.height ? (double)b_rect.height/a_rect.height : (double)a_rect.height/b_rect.height;
+
+                    if (((a_rect & b_rect) != b_rect) && (a_centroid.x < b_centroid.x) && (height_ratio < 4))
+                            // && equivalence.areEquivalent(letters_[i], letters_[j]))
                     {
-                        double deformation_cost = eval( letters_[i], letters_[j] );
-                        edges_.insert( std::make_pair( i, std::make_pair( j, deformation_cost ) ) ); 
+                        EdgeWeights edge_weights = eval(letters_[i], letters_[j]);
+                        edges_.insert( std::make_pair( i, std::make_pair( j, edge_weights) ) ); 
                     }
                 }
             }
@@ -225,7 +286,7 @@ class WordGenerator
         void updateTable();
 // =============================finding element in scores table ==========================
 
-        std::tuple<int, int, double> findMaxSuccesor( int base_index, int start_optimal_row, int start_word_col );
+        std::tuple<int, int, double> findMaxSuccesor( int base_index, int start_optimal_row, int start_word_col, WordDescriptors & descriptors );
 
         std::tuple<int, int, double> findMaxConfiguration( int start_row, int start_col );
 
@@ -240,6 +301,15 @@ class WordGenerator
         double getMaxDistance( int i );
         double getDistance( int i, int j );
         double getCharacterScoreOnly( const std::vector<int> &indices, double score );
+
+        // ==========================word descriptor =======================
+        //
+        void initWordDescPrototypes(const cv::Mat & image);
+        WordDescriptors mergeDescriptors(const WordDescriptors & a, 
+                const WordDescriptors & b, double space_dist);
+        // void mergeDescInformation(std::size_t i, std::size_t j, float dist);
+        //
+        double spaceDist(const Letter & a, const Letter & b);
 };
 
 
@@ -258,6 +328,9 @@ class WangWordGenerator
         const double gamma_ = 1.0; 
         const double epsilon_ = 1;
         const double theta_ = 0.05;
+        // const double gamma_ = 1.0; 
+        // const double epsilon_ = 1;
+        // const double theta_ = 0.05;
         std::string text_;
 
         std::vector< Letter> letters_;

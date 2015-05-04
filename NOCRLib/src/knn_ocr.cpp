@@ -16,6 +16,13 @@ using namespace std;
 const std::string KNNOcr::alpha_ = "oi23456789abcdefghjkmnpqrstuvwxyzABDEFGHKLMNQRTY";
 
 
+KNNOcr::KNNOcr(const std::string & train_data_file)
+{
+    DirectionHistogramFactory factory;
+    dir_hist_ = factory.createFeatureExtractor();
+    loadTrainData(train_data_file);
+}
+
 void KNNOcr::loadTrainData( const std::string &train_data_file )
 {
     LoadTrainData<feature::DirectionHist>::load( train_data_file, train_data_, labels_ );

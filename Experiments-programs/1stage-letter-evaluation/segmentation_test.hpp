@@ -21,9 +21,9 @@
 
 #include <opencv2/core/core.hpp>
 
+#include "../common/segmentation_base.hpp"
 
-
-class LetterSegmentTesting
+class LetterSegmentTesting : public LetterSegmentBase
 {
 public:
     LetterSegmentTesting() 
@@ -31,7 +31,7 @@ public:
 
     ~LetterSegmentTesting() { };
 
-    void loadGroundTruthXML(const std::string & xml_gt_file);
+    // void loadGroundTruthXML(const std::string & xml_gt_file);
 
     void updateScores( const std::string &image_name, 
             const std::vector<Component> &letters );
@@ -58,12 +58,11 @@ public:
         return curr_img_;
     }
 
-    void notifyResize(const std::string & name, double scale);
 
 protected:
-    std::map<std::string, std::vector<cv::Rect> > ground_truth_;
+    // std::map<std::string, std::vector<cv::Rect> > ground_truth_;
 
-    bool areMatching(const cv::Rect & c_rect, const cv::Rect & gt_rect);
+    // bool areMatching(const cv::Rect & c_rect, const cv::Rect & gt_rect);
     void draw(const Component & c);
 
     unsigned int true_positives_;

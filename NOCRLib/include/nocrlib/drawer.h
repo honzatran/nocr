@@ -68,6 +68,8 @@ class DrawerInterface
 class RectangleDrawer : public DrawerInterface
 {
     public:
+        RectangleDrawer();
+
         void init( const cv::Mat &image ) override;
 
         void draw( const Component &c ) override;
@@ -78,9 +80,12 @@ class RectangleDrawer : public DrawerInterface
 
         cv::Mat getImage() override { return canvas_; } 
 
-        void drawRectangle( const cv::Rect &rect, const cv::Scalar &color = cv::Scalar( 0, 0, 255 ) );
+        void drawRectangle( const cv::Rect &rect);
+
+        void setColor(const cv::Scalar & color); 
     private:
         cv::Mat canvas_;
+        cv::Scalar color_;
 };
 
 

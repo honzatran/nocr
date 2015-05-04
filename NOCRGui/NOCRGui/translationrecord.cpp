@@ -43,7 +43,16 @@ QGraphicsScene* TranslationRecord::loadScene()
         cv::Rect rect = w.visual_information_.getRectangle();
         scene->addRect(scale * rect.x, scale * rect.y,
                 scale * rect.width, scale * rect.height, pen );
+
+        for (const auto & l : w.visual_information_.getLetters())
+        {
+            cv::Rect l_rect = l.getRectangle();
+
+            scene->addRect(scale * l_rect.x, scale * l_rect.y,
+                    scale * l_rect.width, scale * l_rect.height, pen );
+        }
     }
+
     return scene;
 }
 

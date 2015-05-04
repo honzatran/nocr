@@ -100,3 +100,40 @@ bool TranslationInfo::haveSameLabels( char a, char b )
 
    return a_label == b_label;
 }
+
+std::vector<int> TranslationInfo::getLabels(const std::string & str)
+{
+    vector<int> labels;
+    labels.reserve(str.size());
+    for (char c : str)
+    {
+        auto it = alpha_label_.find(c);
+        if (it != alpha_label_.end())
+        {
+            labels.push_back(it->second);
+        }
+        else
+        {
+            labels.push_back(-1);
+        }
+    }
+
+    return labels;
+}
+
+
+
+
+std::vector<cv::Point> Word::getCentroids() const 
+{
+    std::vector<cv::Point> points;
+    points.reserve(letters_.size());
+
+    for (const Letter & l : letters_)
+    {
+        points.push_back(l.getCentroid());
+    }
+
+    return points; 
+}
+

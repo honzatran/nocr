@@ -16,7 +16,6 @@ set( SOURCES
 set( Qt5Path /opt/Qt5.0.1/5.0.1/gcc )
 set( CMAKE_PREFIX_PATH ${Qt5Path} )
 
-
 find_package(Qt5Widgets REQUIRED )
 find_package(Qt5Core REQUIRED )
 find_package(Qt5Gui REQUIRED )
@@ -27,16 +26,18 @@ qt5_wrap_ui( UIS_HDRS
     NOCRGui/newwordsdialog.ui 
     )
 
-add_executable(NOCRGui ${SOURCES} ${UIS_HDRS} )
-qt5_use_modules(NOCRGui Widgets)
-qt5_use_modules(NOCRGui Core)
-qt5_use_modules(NOCRGui Gui)
-qt5_use_modules(NOCRGui Xml)
+set (bin_exec NOCRGui)
+
+add_executable(${bin_exec} ${SOURCES} ${UIS_HDRS} )
+qt5_use_modules(${bin_exec} Widgets)
+qt5_use_modules(${bin_exec} Core)
+qt5_use_modules(${bin_exec} Gui)
+qt5_use_modules(${bin_exec} Xml)
 
 
-target_link_libraries( NOCRGui NOCRLib )
-target_link_libraries( NOCRGui ${OpenCV_LIBS} )
-target_link_libraries( NOCRGui ${NOCR_EXTERNAL_LIB}/libLibSVM.a ) 
-target_link_libraries( NOCRGui ${NOCR_EXTERNAL_LIB}/libLibLinear.a ) 
+target_link_libraries( ${bin_exec} NOCRLib )
+target_link_libraries( ${bin_exec} ${OpenCV_LIBS} )
+target_link_libraries( ${bin_exec} ${Boost_LIBRARIES})
+target_link_libraries( ${bin_exec} ${required_libraries})
 
 

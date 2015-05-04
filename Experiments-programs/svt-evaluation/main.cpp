@@ -84,9 +84,9 @@ void drawAndShow( const std::vector<T> &objects,
     gui::showImage( drawer->getImage(), "detected letters" );
 }
 
-template <typename M>
+template <typename M, typename OCR>
 std::vector<TranslatedWord> runTest(
-        Segment<M> & segmentation,
+        Segment<M, OCR> & segmentation,
         Testing & testing,
         const LetterWordEquiv & word_equiv,
         const Dictionary & dict, 
@@ -114,7 +114,7 @@ int main( int argc, char **argv )
     const string merge_conf = "conf/svmMerge.conf";
     // const string er1_conf_file = "conf/boostGeom.conf";
 
-    Segment<CvMSERDetection> segmentation; 
+    Segment<CvMSERDetection, MyOCR> segmentation; 
 
     CvMSERDetection detection_method;
     detection_method.loadConfiguration(filter_conf);
@@ -133,7 +133,7 @@ int main( int argc, char **argv )
     auto decider = std::make_shared<TruePositiveTest>();
     mser_testing.setTruePositiveDecider(decider.get());
 
-    Segment<ERTextDetection> er_text_segment;
+    Segment<ERTextDetection, MyOCR> er_text_segment;
     ERTextDetection er_text_detection( er1_conf_file, er2_conf_file );
     er_text_segment.loadMethod(&er_text_detection);
     er_text_segment.loadOcr( ocr.get() );

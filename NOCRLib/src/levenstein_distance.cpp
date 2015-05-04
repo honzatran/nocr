@@ -14,7 +14,7 @@
 
 using namespace std;
 
-int LevensteinDistance::operator() ( const string &a, const string &b )
+int StringLevensteinDistance::operator() ( const string &a, const string &b )
 {
     const int rows = a.size() + 1;
     const int cols = b.size() + 1; 
@@ -48,7 +48,7 @@ int LevensteinDistance::operator() ( const string &a, const string &b )
     return distances[a.size()][b.size()];
 }
 
-int LevensteinDistance::minimum( int a, int b, int c )
+int StringLevensteinDistance::minimum( int a, int b, int c )
 {
     return std::min( a, std::min( b,c ) );
 }
