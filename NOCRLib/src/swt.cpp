@@ -197,7 +197,6 @@ auto SwtTransform::getLookUp( const cv::Point &p )
     return point_neighbours_.find( key );
 }
 
-
 void SwtTransform::show( const cv::Mat &distances )
 {
     cv::Mat tmp, tmp1;
@@ -216,20 +215,23 @@ std::vector<float> SwtRatio::compute( Component &c )
     // swt_.show( swtImage );
     // auto swtEnd = std::chrono::steady_clock::now();
     // std::cout << "computing of stroke width takes "<< tc( start,swtEnd ).count() << "ms" << std::endl;
-    cv::Vec<double,1> mean, standard_deviation;
-    cv::meanStdDev( swtImage, mean, standard_deviation, binary );
+    //
+    float mean, std_dev;
 
-    swt_mean_ = mean[0];
-    std::vector<float> output;
-    output.push_back( standard_deviation[0]/mean[0] );
-    return output;
+    std::tie(mean, std_dev) = getMeanStdDev<float>(c.getPoints(), swtImage, c.getLeftUpperCorner() - cv::Point(1,1));
+
+    std::size_t k = c.size();
+
+    return { std_dev/mean * (1 + 1/(4*k)) };
 }
 
 std::vector<float> SwtMean::compute( Component &c )
 {
     std::vector<float> output;
-    output.push_back( computeSwtMean(c) );
-    return output;
+    float f = computeSwtMean(c);
+
+    cout  << f << endl;
+    return { f };
 }
 
 float SwtMean::computeSwtMean( Component &c )

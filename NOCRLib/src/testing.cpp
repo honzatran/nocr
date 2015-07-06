@@ -1,6 +1,7 @@
 #include "../include/nocrlib/testing.h"
 #include "../include/nocrlib/assert.h"
 #include "../include/nocrlib/iooper.h"
+#include "../include/nocrlib/exception.h"
 
 #include <cctype>
 
@@ -11,8 +12,10 @@
 #define TEXT_TAG "text"
 #define TRUE_POSITIVE "true-positive"
 #define LETTER_NODE "letter-node"
-#define LETTER_CHAR_TAG "letter-node"
-#define LETTER_CONFIDENCE_TAG "letter-node"
+#define LETTER_CHAR_TAG "char"
+#define LETTER_CONFIDENCE_TAG "confidence"
+#define PRECISION_TAG "precision"
+#define RECALL_TAG "recall"
 
 using namespace std;
 
@@ -162,6 +165,17 @@ bool ImageGroundTruth::containWord(
     return false;
 }
 
+std::vector<cv::Rect> ImageGroundTruth::getGtRectangles() const
+{
+    std::vector<cv::Rect> rectangles;
+    for (auto & word_rec : records_)
+    {
+        rectangles.push_back(word_rec.bbox);
+    }
+
+    return rectangles;
+}
+
 //==============================================
 //
 bool TruePositiveTest::isTruePositive( 
@@ -175,7 +189,7 @@ bool TruePositiveTest::isTruePositive(
         return false;
     }
 
-    bool gt_condition = (double)intersection.area()/gt_bbox.area() > 0.8;
+    bool gt_condition = (double)intersection.area()/gt_bbox.area() > 0.6;
     bool detected_condition = (double)intersection.area()/detected_bbox.area() > 0.4;
 
     return gt_condition && detected_condition;
@@ -219,6 +233,9 @@ std::vector<bool> Testing::updateScores(
 
     std::vector<bool> results(words.size(), false);
 
+    std::size_t curr_img_true_positive = 0;
+    
+
     if ( it != ground_truth_.end() )
     {
         auto image_node = root_.append_child(IMAGE_TAG);
@@ -239,7 +256,7 @@ std::vector<bool> Testing::updateScores(
 
             if ( ground_truth.containWord(words[i], decider_ptr_) )
             {
-                true_positives_++;
+                ++curr_img_true_positive;
                 results[i] = true;
 
                 word_node.append_attribute(TRUE_POSITIVE) = true;
@@ -249,6 +266,12 @@ std::vector<bool> Testing::updateScores(
                 word_node.append_attribute(TRUE_POSITIVE) = false;
             }
         }
+
+        image_node.append_attribute(PRECISION_TAG) = words.size() != 0 ? (double)curr_img_true_positive/words.size() : 0;
+
+        image_node.append_attribute(RECALL_TAG) = (double)curr_img_true_positive/ground_truth.getCount();
+
+        true_positives_ += curr_img_true_positive;
 
         return results;
     }
@@ -277,8 +300,10 @@ void Testing::makeRecord( std::ostream &oss ) const
         << " (#true positive/#ground truth)" << endl;
 }
 
-void Testing::printXmlOutput(std::ostream & oss) const
+void Testing::printXmlOutput(std::ostream & oss) 
 {
+    root_.append_child(PRECISION_TAG).text() = getPrecision();
+    root_.append_child(RECALL_TAG).text() = getRecall();
     doc_.save(oss);
 }
 
@@ -315,6 +340,20 @@ void Testing::createWordNode(pugi::xml_node & word_node, const TranslatedWord & 
         letter_node.append_attribute( LETTER_CHAR_TAG).set_value(letter_str.c_str());
         letter_node.append_attribute( LETTER_CONFIDENCE_TAG) = l.getConfidence();
     }
+}
+
+std::vector<cv::Rect> Testing::getGtRectangles(const std::string & image_name) const
+{
+    auto it = ground_truth_.find( image_name );
+
+    if (it == ground_truth_.end())
+    {
+        return vector<cv::Rect>();
+    }
+
+    const ImageGroundTruth & gt = it->second;
+
+    return gt.getGtRectangles();
 }
 //========================================================
 //
@@ -383,6 +422,42 @@ auto EvaluationDrawer::getLetterRecords(const pugi::xml_node & word_node)
     }
 
     return letters;
+}
+
+cv::Mat EvaluationDrawer::drawResults(const std::string & file_name, const cv::Mat & image)
+{
+    auto it = detection_results_.find(file_name);
+    
+    if (it == detection_results_.end())
+    {
+        throw FileNotFoundException("no record for image " + file_name);
+    }
+
+    cv::Mat copy;
+    image.copyTo(copy);
+
+    const auto & words = it->second;
+
+    for (const auto & w : words)
+    {
+        cv::Rect word_bbox = w.word_bbox;
+
+        cv::Scalar color = w.ground_truth ? cv::Scalar(255, 0, 0) : cv::Scalar(0, 0, 255);
+
+        cv::rectangle(copy, word_bbox, color, 3);
+
+        const auto & letters = w.letters_records;
+
+        for (const auto & l : letters)
+        {
+            cv::Rect l_rect = l.bbox;
+
+            cv::Scalar color = w.ground_truth ? cv::Scalar(127, 0, 0) : cv::Scalar(0, 0, 127);
+            cv::rectangle(copy, l_rect, color, 2);
+        }
+    }
+
+    return copy;
 }
 
 

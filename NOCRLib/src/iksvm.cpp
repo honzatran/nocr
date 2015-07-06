@@ -269,6 +269,8 @@ IKSVM IKSVMConvertor::createFromSvmProblem( svm_model *model, int num_segment )
     nr_class_ = model->nr_class;
     int number_subproblems = nr_class_*( nr_class_ - 1 )/2;
 
+    features_dim_ = 144;
+
     auto rho = std::vector<double>(model->rho, model->rho + number_subproblems );
     auto prob_a = std::vector<double>(model->probA, model->probA + number_subproblems );
     auto prob_b = std::vector<double>(model->probB, model->probB + number_subproblems );
@@ -458,17 +460,17 @@ IKSVM::IKSVM( int nr_class, int features_dim, int approx_count,
 {
     int number_subproblems = decision_function.size();
     decision_values_b_.resize(number_subproblems);
-    decision_function_.resize(number_subproblems * features_dim_ * approx_count_);
-    decision_function_info_.resize(number_subproblems * features_dim_);
+    decision_function_.reserve(number_subproblems * features_dim_ * approx_count_);
+    decision_function_info_.reserve(number_subproblems * features_dim_);
 
     for (std::size_t i = 0;i < decision_function.size(); ++i)
     {
         decision_values_b_[i] = decision_function[i].b_;
-        auto info = decision_function[i].step_size_;
+        auto & info = decision_function[i].step_size_;
         decision_function_info_.insert(decision_function_info_.end(),
                 info.begin(), info.end());
 
-        auto values = decision_function[i].function_values_;
+        auto & values = decision_function[i].function_values_;
         decision_function_.insert(decision_function_.end(),
                 values.begin(), values.end());
     }

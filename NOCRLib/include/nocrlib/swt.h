@@ -73,6 +73,7 @@ class SwtTransform
          */
         cv::Mat operator() ( const cv::Mat &gray_image, bool zero_padding = false );
 
+        static void show( const cv::Mat &distances );
     private:
         cv::Mat input_;
 
@@ -82,7 +83,6 @@ class SwtTransform
 
         cv::Mat getStrokeWidthTransformation(); 
         
-        void show( const cv::Mat &distances );
 
         int getCodeOfPosition( const cv::Point &p ) 
         {
@@ -199,6 +199,30 @@ class SwtMean : public AbstractFeatureExtractor
     private:
        SwtTransform swt_;
 };
+
+template <typename T>
+std::pair<float, float> getMeanStdDev(const std::vector<cv::Point> & points,
+        const cv::Mat & img, cv::Point offset = cv::Point(0,0))
+{
+    float sum, sum_sqr;
+    sum = sum_sqr = 0;
+
+    for (cv::Point p : points)
+    {
+        cv::Point tmp = p - offset;
+        T val = img.at<T>(tmp.y, tmp.x);
+
+        sum += val;
+        sum_sqr += val * val;
+    }
+
+    std::size_t k = points.size();
+
+    float mean = sum/k;
+    float variance = (sum_sqr + k * mean * mean - 2 * mean * sum)/(k - 1);
+
+    return std::make_pair(mean, std::sqrt(variance));
+}
 
 
 #endif

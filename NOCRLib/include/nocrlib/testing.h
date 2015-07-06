@@ -81,6 +81,7 @@ class ImageGroundTruth
                 const TranslatedWord & word, 
                 TruePositiveInterface * tp_ptr);
 
+        std::vector<cv::Rect> getGtRectangles() const;
     private:
         struct WordRecord
         {
@@ -224,7 +225,9 @@ class Testing
 
         void notifyResize(const std::string & name, double scale);
 
-        void printXmlOutput(std::ostream &oss) const;
+        void printXmlOutput(std::ostream &oss);
+
+        std::vector<cv::Rect> getGtRectangles(const std::string & file_name) const;
 
     private:
         std::map<std::string, ImageGroundTruth> ground_truth_;
@@ -252,6 +255,8 @@ class EvaluationDrawer
         void loadXml(const pugi::xml_document & doc);
 
         void loadXml(const std::string & xml_file);
+
+        cv::Mat drawResults(const std::string & file_name, const cv::Mat & image);
 
     private:
         struct LetterRecord

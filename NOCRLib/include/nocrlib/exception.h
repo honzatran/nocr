@@ -93,6 +93,32 @@ class BadFileFormatting : public std::exception
 
 };
 
+template <typename T> 
+class NocrException : public std::exception
+{
+    public:
+        NocrException( const std::string &msg )
+            : msg_(msg)
+        {
+
+        }
+
+        void appendMsg( const std::string &msg )
+        {
+            msg_ += ' ';
+            msg_.append(msg);
+        }
+
+        virtual const char* what() const NOEXCEPT override
+        {
+            std::string final_msg = "BadFileFormatting:" + msg_;
+            return final_msg.c_str();
+        }
+    private:
+        std::string msg_;
+};
+
+
 /**
  * @brief exception is thrown when bad file formating occurs
  */

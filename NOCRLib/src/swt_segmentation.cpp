@@ -1,21 +1,47 @@
 
 #include "../include/nocrlib/swt_segmentation.h"
 #include "../include/nocrlib/utilities.h"
+#include "../include/nocrlib/extremal_region.h"
 
 SwtLetterSegmentation::SwtLetterSegmentation()
 {
     min_area_ = 100;
     max_area_ = 50000;
     svm_ = nullptr;
-    geom_feature_ = nullptr;
+    
+    FeatureTraits<feature::ERGeom1>::FactoryType factory;
+
+    geom_feature_ = factory.createFeatureExtractor();
+
+}
+
+void SwtLetterSegmentation::loadConfiguration(const std::string & classifer_configuration)
+{
+    if (!svm_)
+    {
+        svm_ = create<LibSVM, feature::SwtGeom1>();
+    }
+
+    svm_->loadConfiguration(classifer_configuration);
 }
 
 auto SwtLetterSegmentation::segmentFromImage( const cv::Mat &image )
-    -> std::vector< LetterStorage<float> >
+    -> std::vector< CompPtr >
 {
-    cv::Mat binary = localBinarization(image);
+    cv::Mat grayscale;
 
-    std::vector< LetterStorage<float> > 
+    if (image.type() == CV_8UC3)
+    {
+        cv::cvtColor(image, grayscale, CV_BGR2GRAY);
+    }
+    else
+    {
+        grayscale = image;
+    }
+
+    cv::Mat binary = localBinarization(grayscale);
+
+    std::vector< CompPtr > 
             comp_ptrs = getLetterStorages(binary);
 
     cv::bitwise_not(binary, binary);
@@ -50,30 +76,42 @@ cv::Mat SwtLetterSegmentation::localBinarization( const cv::Mat &image )
 }
 
 auto SwtLetterSegmentation::getLetterStorages( const cv::Mat &binary )
-    -> std::vector< LetterStorage<float> >
+    -> std::vector< CompPtr >
 {
     cv::Mat swt_image = swt_(binary);
+
 
     ComponentFinder< SwtMergerRule, 
         connectivity::eightpass > component_finder( swt_image, SwtMergerRule( swt_image ) );
 
+    double min_area_ratio, max_area_ratio;
+    std::tie(min_area_ratio, max_area_ratio) = ErLimitSize::getErSizeLimits(binary.size());
+
+    std::size_t area = binary.size().area();
+
+    min_area_ = std::max<std::size_t>(20, min_area_ratio * area); 
+    max_area_ = max_area_ratio * area;
+
+
     auto comps = component_finder.findAllComponents();
-    std::vector< LetterStorage<float> > comp_ptrs;
+    std::vector< CompPtr > comp_ptrs;
     for ( auto &c : comps )
     {
         if ( c.size() > min_area_ &&  c.size() < max_area_ )
         {
-            auto descriptor = geom_feature_->compute( c );
-            cv::Scalar_<float> swt_mean, swt_stddev;
-            cv::meanStdDev( swt_image, swt_mean, swt_stddev, c.getPoints() );
-            descriptor.push_back( swt_mean[0]/swt_stddev[0] );
+            auto descriptor = geom_feature_->compute(c);
+            float mean, std_dev;
+            std::tie(mean, std_dev) = getMeanStdDev<float>(c.getPoints(), swt_image);
+            std::size_t k = c.size();
 
-            if ( svm_->predict( descriptor ) )
+            descriptor.push_back(std_dev/mean * (1 + 1/(4*k)));
+
+            // gui::showImage(c.getBinaryMat(), "comp");
+
+            if ( svm_->predict( descriptor ) != 0)
             {
                 comp_ptrs.push_back( 
-                        LetterStorage<float>( 
-                            std::make_shared<Component>( std::move(c) ),
-                            swt_mean[0]) );
+                            std::make_shared<Component>(c));
             }
         }
     }
@@ -100,3 +138,4 @@ ImageLetterInfo SwtStorageConvertor::convert
 
     return ImageLetterInfo( component_means, perim_means, l_storage.stat_ );
 }
+

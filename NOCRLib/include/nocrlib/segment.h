@@ -123,7 +123,6 @@ template <typename T, typename OCR> class Segment
 {
     public:
         typedef typename SegmentationPolicy<T>::MethodOutput MethodOutput; 
-        typedef typename SegmentationPolicy<T>::VisualConvertor VisualConvertor;
 
         /**
          * @brief Default constructor
@@ -180,7 +179,6 @@ template <typename T, typename OCR> class Segment
 #endif 
             // set ocr and visual_convertor_
             ocr_->setImage( image );
-            SegmentationPolicy<T>::initialize( visual_convertor_, image );
             
             if ( SegmentationPolicy<T>::k_perform_nm_suppresion )
             {
@@ -197,12 +195,11 @@ template <typename T, typename OCR> class Segment
 
     private:
         T *method_ptr_;
-        VisualConvertor visual_convertor_;
         OCR * ocr_;
 
 
 
-        std::vector<Letter> nonMaxSuppresion( const std::vector<MethodOutput> &objects ) 
+        std::vector<Letter> nonMaxSuppresion( std::vector<MethodOutput> &objects ) 
         {
 #if PRINT_TIME
             timeCounter<std::chrono::steady_clock, 
@@ -221,7 +218,7 @@ template <typename T, typename OCR> class Segment
             return extractMaximal(objects,translations,mask);
         }
 
-        std::vector<TranslationInfo> translate( const std::vector<MethodOutput> &objects ) 
+        std::vector<TranslationInfo> translate( std::vector<MethodOutput> &objects ) 
         {
             std::vector<TranslationInfo> translations;
             translations.reserve( objects.size() );
@@ -241,10 +238,20 @@ template <typename T, typename OCR> class Segment
                 for ( size_t j = i + 1; j < translations.size(); ++j )
                 {
                     if ( !SegmentationPolicy<T>::
-                            haveSignificantOverlap( objects[i], objects[j] ) )
+                            haveSignificantOverlap( objects[i], objects[j] ))
                     {
                         continue;
                     }
+                    //
+                    if (translations[i].getTranslation() != translations[j].getTranslation()
+                            && translations[i].getConfidence() > 0.8 
+                            && translations[j].getConfidence() > 0.8)
+                    {
+                        continue;
+                    }
+
+
+
                     mask_creator.update( translations[i], i, translations[j], j );
                 }
             }
@@ -261,14 +268,12 @@ template <typename T, typename OCR> class Segment
                 if ( mask[i] ) 
                 {
                     output.push_back( SegmentationPolicy<T>::
-                            convert( visual_convertor_, objects[i], translations[i] ) );
+                            convert( objects[i], translations[i] ) );
                 }
             }
 
-#if PRINT_TIME
-            std::cout << "ocr max suppresion:" << translations.size() 
-                << "/" << output.size() << std::endl;
-#endif
+            // std::cout << "ocr max suppresion:" << translations.size() 
+                // << "/" << output.size() << std::endl;
             return output;
         }
 };

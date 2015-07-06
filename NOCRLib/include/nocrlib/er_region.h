@@ -63,8 +63,6 @@ struct ProbabilityRecord
 
 
 
-class ERStat;
-
 /**
  * @brief Region represents component in image. Class contain 
  * list of all components pixel, its gray level and 
@@ -201,51 +199,6 @@ class ERRegion
         std::vector<float> getFeatures() const;
 
         /**
-         * @brief returns minimum probability from childs delta-neighbourhood 
-         *
-         * @return ProbabilityRecord, the probability and depth from this node 
-         */
-        ProbabilityRecord getChildMinProbability() { return minProb_; }
-
-        /**
-         * @brief returns maximum probability from childs delta-neighbourhood 
-         *
-         * @return ProbabilityRecord, the probability and depth from this node 
-         */
-        ProbabilityRecord getChildMaxProbability() { return maxProb_; }
-
-        /**
-         * @brief set child max probability
-         *
-         * @param maxProb, max probability
-         */
-        void setChildMaxProbability( ProbabilityRecord maxProb )
-        {
-            maxProb_ = maxProb;
-        }
-        
-        /**
-         * @brief set child min probability
-         *
-         * @param minProb, max probability
-         */
-        void setChildMinProbability( ProbabilityRecord minProb )
-        {
-            minProb_ = minProb;
-        }
-
-        /**
-         * @brief return true if this node is local maximum in 
-         * childs delta-neighbourhood, 
-         *
-         * @return 
-         */
-        bool isLocalChildMaximum() const 
-        {
-            return maxProb_.depth_ == 0;
-        }
-
-        /**
          * @brief return true if region is similar to reg
          *
          * @param reg, other region
@@ -254,74 +207,9 @@ class ERRegion
          */
         bool isSimilarParent( const ERRegion &reg );
         
-        /**
-         * @brief updates means of color
-         *
-         * @param blue 
-         * @param red
-         * @param green
-         * @param gray
-         */
-        void updateMeans( uchar blue, uchar red, uchar green, uchar gray );
-
-        /**
-         * @brief updates means of color
-         *
-         * @param new_values
-         */
-        void updateMeans( const cv::Vec4b &new_values ); 
-
         void updateEulerBit(std::uint16_t quads);
 
-        /**
-         * @brief create ERStat based on means
-         *
-         * @return ERStat
-         */
-        ERStat createERStat() const;
-
-        int hole_area_;
     private:
-        // private classes
-        struct EulerQuadRecord
-        {
-            EulerQuadRecord() 
-                : q1Count_(0), q2Count_(0), q2DCount_(0), q3Count_(0) 
-            { 
-            }
-            
-            const static float c;
-
-            static const int start_zero[];
-            static const int start_one[];
-            static const int start_three[];
-            static const int start_four[];
-
-            void update( bool *q );
-            // void changeAtQuad( int start, int elemToChange, bool *quad );
-            void changeAtQuad(const int *indices, int elemToChange, bool *quad );
-
-            int getEulerNumber() const 
-            {
-                return ( q1Count_ - q3Count_ + 2 * q2DCount_ )/4;
-            }
-
-            float getPerimeterLength() const 
-            {
-                // return ( q1Count_ + q2Count_ + q3Count_ + 2*q2DCount_ );
-                return q2Count_ + c * ( q1Count_ + 2 * q2DCount_ + q3Count_ );
-            }
-
-            void merge( const EulerQuadRecord &a )
-            {
-                q1Count_ += a.q1Count_;
-                q2Count_ += a.q2Count_;
-                q2DCount_ += a.q2DCount_;
-                q3Count_ += a.q3Count_;
-            }
-
-            int q1Count_, q2Count_, q2DCount_, q3Count_;
-        };
 
         struct EulerQuadRecordBit
         {
@@ -429,6 +317,10 @@ class ERRegion
         int y_max_;
         int y_min_;
 
+        size_t size_;
+        LinkedPoint *head_;
+        LinkedPoint *tail_;
+
         CompPtr c_ptr_;
 
         // EulerQuadRecord rec_;
@@ -438,14 +330,6 @@ class ERRegion
         int med_crossing;
         float probability_;
 
-        size_t size_;
-        LinkedPoint *head_;
-        LinkedPoint *tail_;
-
-        cv::Vec4i sums_;
-
-        ProbabilityRecord minProb_;
-        ProbabilityRecord maxProb_;
 
         void init();
         void updateSize( cv::Point p );
@@ -453,37 +337,6 @@ class ERRegion
         friend class ERFilter1Stage;
         friend class ERFilter2Stage;
 };
-
-/**
- * @brief class containing information about color means of 
- * certain components
- *
- * This class is used as a storage for information computed in ER extraction, 
- * but used in generating words for letter equivalence.
- */
-class ERStat
-{
-    public:
-        ERStat() = default;
-
-        ERStat( float blue_mean, float green_mean, 
-                float red_mean, float intensity_mean )
-            : blue_mean_(blue_mean), green_mean_(green_mean),
-            red_mean_(red_mean), intensity_mean_(intensity_mean )
-        {
-
-        }
-        
-        ~ERStat() { }
-
-        float blue_mean_;
-        float green_mean_;
-        float red_mean_;
-        float intensity_mean_;
-
-    private:
-};
-
 
 
 

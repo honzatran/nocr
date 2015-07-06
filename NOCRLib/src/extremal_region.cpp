@@ -36,30 +36,6 @@ bool ERFilter2Stage::isLetter( ERRegion &r )
     return svm_.predict( features ) == 1;
 }
 
-void ERFilter2Stage::operator() (ERRegion & err)
-{
-    auto c = err.toComponent();
-    vector<float> features = err.getFeatures();
-    vector<float> data = features_extractor_->compute( c);
-    features.insert( features.end(), data.begin(), data.end() );
-
-    if (svm_.predict(features) == 1)
-    {
-        storages_.push_back( LetterStorage<ERStat>( std::make_shared<Component>(
-                        std::move(c)), err.createERStat() ));
-    }
-}
-
-std::vector<LetterStorage<ERStat> > ERFilter2Stage::getLetters() const
-{
-    return storages_;
-}
-
-void ERFilter2Stage::clearLetters()
-{
-    storages_.clear();
-}
-
 // ==================================extremal region============================
 
 ERTree::ERTree( double min_area_ratio, double max_area_ratio ) 
@@ -75,31 +51,29 @@ void ERTree::loadSecondStageConf( const string &second_stage_conf )
 
 void ERTree::setImage( const cv::Mat &image )
 {
-    vector<cv::Mat> bgr_mat;
     if ( image.type() == CV_8UC3 )
     {
         // image has BGR format
-        cv::split( image, bgr_mat );
+        // cv::split( image, bgr_mat );
         cv::Mat gray_image;
         cv::cvtColor( image, gray_image, CV_BGR2GRAY ); 
-        bgr_mat.push_back( gray_image );
+        // bgr_mat.push_back( gray_image );
         cv::copyMakeBorder( gray_image, bitmap_, 1, 1, 1, 1, cv::BORDER_CONSTANT, 255 );
     }
     else if ( image.type() == CV_8UC1 )
     {
         // image has grayscale format
         cv::copyMakeBorder( image, bitmap_, 1, 1, 1, 1, cv::BORDER_CONSTANT, 255 );
-        cv::Mat bgr_image;
-        cv::cvtColor( image, bgr_image, CV_GRAY2BGR );
-        cv::split( bgr_image, bgr_mat );
-        bgr_mat.push_back( image );
+        // cv::Mat bgr_image;
+        // cv::cvtColor( image, bgr_image, CV_GRAY2BGR );
+        // cv::split( bgr_image, bgr_mat );
     }
     else
     {
         NOCR_ASSERT(false, "wrong input image format"); 
     }
 
-    cv::merge( bgr_mat, value_mat_ );
+    // cv::merge( bgr_mat, value_mat_ );
     rows_ = image.rows + 2; 
     cols_ = image.cols + 2;
 
@@ -192,8 +166,8 @@ void ERTree::accumulate( NodeType *reg, int code )
     //                         horiz_cross_change , quad );
     ptr->addPoint( &points_[processed_points_++], horiz_cross_change);
     // minus offset (1,1) because of add zero border
-    ptr->updateMeans( 
-            value_mat_.at<cv::Vec4b>( accumulated_point.y - 1, accumulated_point.x -1 ) );
+    // ptr->updateMeans( 
+    //         value_mat_.at<cv::Vec4b>( accumulated_point.y - 1, accumulated_point.x -1 ) );
     ptr->updateEulerBit(mask);
     accumulated_pixels_[code] = true;
 }
@@ -217,7 +191,7 @@ void ERTree::merge( NodeType *child, NodeType *parent )
             // child node meets conditions to be an ER
             parent->addChild( child );
             // update parent child probabilities
-            setChildrensProbabilities( parent,child );
+            // setChildrensProbabilities( parent,child );
             return;
         }
     }
@@ -225,19 +199,19 @@ void ERTree::merge( NodeType *child, NodeType *parent )
     // else we deallocate children and connect childs children to parent
     // and update parent child probabilities
     parent->reconnectChildren( child );
-    ProbabilityRecord child_max = child->getVal().getChildMaxProbability();
-    ProbabilityRecord parent_max = parent->getVal().getChildMaxProbability();
-    if ( child_max > parent_max )
-    {
-        parent->getVal().setChildMaxProbability( child_max );
-    }
-
-    ProbabilityRecord child_min = child->getVal().getChildMinProbability();
-    ProbabilityRecord parent_min = parent->getVal().getChildMinProbability();
-    if ( child_min < parent_min )
-    {
-        parent->getVal().setChildMinProbability( child_min );
-    }
+    // ProbabilityRecord child_max = child->getVal().getChildMaxProbability();
+    // ProbabilityRecord parent_max = parent->getVal().getChildMaxProbability();
+    // if ( child_max > parent_max )
+    // {
+    //     parent->getVal().setChildMaxProbability( child_max );
+    // }
+    //
+    // ProbabilityRecord child_min = child->getVal().getChildMinProbability();
+    // ProbabilityRecord parent_min = parent->getVal().getChildMinProbability();
+    // if ( child_min < parent_min )
+    // {
+    //     parent->getVal().setChildMinProbability( child_min );
+    // }
 
     // child node isn't needed anymore 
     // delete child;
@@ -273,105 +247,7 @@ void ERTree::destroyNode(NodeType * node)
 }
 
 
-void ERTree::setChildrensProbabilities( NodeType *parent, NodeType *child )
-{
-    ProbabilityRecord parentMax = parent->getVal().getChildMaxProbability();
-    ProbabilityRecord childMax = child->getVal().getChildMaxProbability();
-    bool minSearch = false;
-    bool maxSearch = false;
-
-    // if children could give us a new local maximum
-    if ( parentMax < childMax ) 
-    {
-        // if children maximum in our reach 
-        // set parent maximum to the childrens 
-        // with incremented depth
-        if ( childMax.depth_ + 1 <= delta_ )
-        {
-            ++childMax.depth_;
-            parent->getVal().setChildMaxProbability( childMax );
-        }
-        // children maximum is out of our reach 
-        else 
-        {
-            maxSearch = true;
-            // bread first search is required
-        }
-    }
-
-    ProbabilityRecord parentMin = parent->getVal().getChildMinProbability();
-    ProbabilityRecord childMin = child->getVal().getChildMinProbability();
-    // if children could give us a new local minimum
-    if ( parentMin > childMin ) 
-    {
-        // if children minimum in our reach 
-        // set parent mininum to the childrens 
-        // with incremented depth
-        if ( childMin.depth_ + 1 <= delta_ )
-        {
-            ++childMin.depth_;
-            parent->getVal().setChildMinProbability( childMin );
-        }
-        // the children minimum is out of our reach 
-        else 
-        {
-            minSearch = true;
-            // bread first search is required
-        }
-    }
-
-    if ( minSearch || maxSearch )
-    {
-        ProbabilityRecord min,max;
-        // finds minimum and maximum using bread first search from child node
-        // and then update parent max and min child probabilities
-        breadthFirstSearchMinMax( child, delta_ -1, parentMax, parentMin ); 
-        parent->getVal().setChildMaxProbability( parentMax );
-        parent->getVal().setChildMinProbability( parentMin );
-    }
-}
-
-
-void ERTree::breadthFirstSearchMinMax( NodeType *root, int maxDepth, 
-        ProbabilityRecord &max, ProbabilityRecord &min )
-// classical BFS from node to its childrens
-// returns min and max probability from all children closer to root then delta
-{
-    typedef std::pair<int, NodeType* > depthRegionPair;
-    std::queue< depthRegionPair > region_queue; 
-    region_queue.push( depthRegionPair( 0,root ));
-
-    while( !region_queue.empty() )
-    {
-        depthRegionPair back = region_queue.back();
-        int depth = back.first;
-        NodeType *reg = back.second;
-        region_queue.pop();
-
-        float probability = reg->getVal().getProbability();
-        if ( max.probability_ < probability ) 
-        {
-            max = ProbabilityRecord( depth, probability );
-        }
-
-        if ( min.probability_ > probability )
-        {
-            min = ProbabilityRecord( depth, probability );
-        }
-
-        for( NodeType* child = reg->child_; child != nullptr; child = child->next_ )
-        {
-            int depth_from_root = depth + child->depth_from_parent_;
-            if ( depth_from_root <= delta_ )
-            {
-                region_queue.push( depthRegionPair( depth_from_root, child ));
-            }
-        }
-    }
-}
-
-
-vector< LetterStorage<ERStat> > ERTree::getLetters( bool deallocate )
+vector< Component > ERTree::getLetters( bool deallocate )
 {
     transformExtreme(); 
     
@@ -403,17 +279,11 @@ vector< LetterStorage<ERStat> > ERTree::getLetters( bool deallocate )
     std::cout << "second stage after rejecting similar " << root_->getNodeCount() << endl;
 #endif
 
-
-    vector<LetterStorage<ERStat> > storages;
-
     vector<NodeType*> nodes;
     saveTree( root_, nodes );
 
-    for (NodeType  * node : nodes)
-    {
-        storages.push_back( LetterStorage<ERStat>(node->getVal().toCompPtr(), 
-                    node->getVal().createERStat() ));
-    }
+    ComponentExtractor extractor;
+    processTree(extractor);
 
     if ( deallocate )
     {
@@ -431,7 +301,7 @@ vector< LetterStorage<ERStat> > ERTree::getLetters( bool deallocate )
         root_ = nullptr;
     }
 
-    return storages;
+    return extractor.getExtractedComponents();
 }
 
 
@@ -494,23 +364,16 @@ void ERTree::transform2StageFiltering()
 
 bool ERTree::isExtremeRegion( NodeType *node )
 {
-    /*
-     * if ( node->getVal().isLocalChildMaximum() ) 
-     * {
-     */
         auto extremeProb = findExtremeParentProb(node);
         // if nodeion is local maximum
         float childMaxProb = node->getVal().getProbability();
         if (extremeProb.second <= childMaxProb) 
         {
-            auto child_min = node->getVal().getChildMinProbability();
-            // float local_min = std::min( extremeProb.first, child_min.probability_ );
             float local_min = extremeProb.first;
             float val = childMaxProb - local_min;
             return ( val >= min_delta_ || val == 0 );
             // return ( val >= min_delta_ );
         }
-    // }
     return false;
 }
 
@@ -566,11 +429,24 @@ void ERTree::rejectSimilar()
 
                 std::size_t parent_size = node->parent_->getVal().getSize();
                 std::size_t size = node->getVal().getSize();
-                std::size_t min_diff = std::max((std::size_t) (size * 0.002), (std::size_t) 10);
+                std::size_t min_diff = ERTree::getMinSizeDiff(size);
+                // std::size_t min_diff = std::max<std::size_t>(size * 0.002, 5);
 
                 return (parent_size - size > min_diff);
             }, root_);
 
+}
+
+std::size_t ERTree::getMinSizeDiff(std::size_t size)
+{
+    if (size < 200)
+    {
+        return 5;
+    } 
+    else
+    {
+        return 0.015 * size;
+    }
 }
 
 bool ERTree::testSimilarChildren( NodeType *node )

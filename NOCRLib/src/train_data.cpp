@@ -43,11 +43,9 @@ void TrainDataLoader::prepareDataForTraining
         train_data.push_back(train_sample);
         ss >> tmp;
         labels.push_back(tmp);
-        NOCR_ASSERT(tmp == 0 || tmp == 1, "wrong tmp value " + std::to_string(tmp) + " count:" + std::to_string(count));
     }
 
-
-    // sort samples by their labels
+    
     // std::sort( data.begin(), data.end(), 
     //         [this] ( const std::vector<float> &a, const std::vector<float> &b )
     //         {

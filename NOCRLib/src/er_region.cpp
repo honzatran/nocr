@@ -13,84 +13,15 @@
 
 #include <opencv2/core/core.hpp>
 
-#define _DEBUG 1
+#define _DEBUG 0
 
 
 using namespace std;
 using namespace cv;
 
-const float ERRegion::EulerQuadRecord::c = 1/sqrt(2);
 const double ERRegion::EulerQuadRecordBit::k_c = 1/sqrt(2);
-const int ERRegion::EulerQuadRecord::start_zero[] = { 0,1,3,4 };
-const int ERRegion::EulerQuadRecord::start_one[] = { 1,2,4,5 };
-const int ERRegion::EulerQuadRecord::start_three[] = { 3,4,6,7 };
-const int ERRegion::EulerQuadRecord::start_four[] = { 4,5,7,8 };
 const int ERRegion::PerimeterLengthTracker::quad_indices[] = { 1,3,4,6 };
 
-void ERRegion::EulerQuadRecord::update( bool *quad )
-{
-    changeAtQuad(start_zero,3,quad); 
-    changeAtQuad(start_one,2,quad); 
-    changeAtQuad(start_three,1,quad); 
-    changeAtQuad(start_four,0,quad);
-}
-
-// void ERRegion::EulerQuadRecord::changeAtQuad( int start, int elemToChange,
-//         bool *quad )
-void ERRegion::EulerQuadRecord::changeAtQuad(const int *indices, int elemToChange, bool *quad )
-{
-    int elemTrue = 0;
-    for ( int i = 0; i < 4; ++i )
-    {
-        if ( quad[ indices[i] ]) 
-        {
-            ++elemTrue;
-        }
-    }
-
-    switch( elemTrue )
-    {
-        case 0:
-            ++q1Count_;
-            break;
-        case 1: 
-            --q1Count_;
-            if ( quad[indices[ 3-elemToChange ]] ) 
-            {
-                ++q2DCount_; 
-            }
-            else 
-            {
-                ++q2Count_;
-            }
-            break;
-        case 2:
-            int diagIn;
-            elemToChange % 3 == 0 ? diagIn = 1 : diagIn = 0;
-            // std::cout << elemToChange << ":" << diagIn << std::endl;
-            // quad[indices[diagIn]] && quad[indices[3-diagIn] ] ? --q2DCount_ : --q2Count_ ;
-            if ( quad[indices[diagIn]] && quad[indices[3-diagIn] ] )
-            {
-                --q2DCount_;
-            }
-            else 
-            {
-                --q2Count_;
-            }
-
-            // if ( q2DCount_ < 0 )
-            // {
-            //     std::cout << "al" << std::endl;
-            // }
-            ++q3Count_;
-            break;
-        case 3:
-            --q3Count_;
-            break;
-        default : 
-            break;
-    }
-}
 
 void ERRegion::EulerQuadRecordBit::update(std::uint16_t quads)
 {
@@ -446,12 +377,9 @@ ERRegion::ERRegion( int grayLevel, cv::Point p ) :
     y_min_ = p.y;
     // horizontalCrossing_ = std::deque<int>(1,0);
     probability_ = 0;
-    minProb_ = ProbabilityRecord( 0, 1 ); // depth 0, probability 1 
-    maxProb_ = ProbabilityRecord( 0, 0 ); // depth 1, probability 0
     // parent_ = 0;
     horizontal_crossings_ = HorizontalCrossingTracker(p.y);
     // ...
-    sums_ = cv::Vec4b(0,0,0,0);
     c_ptr_ = nullptr;
 } 
 
@@ -500,17 +428,6 @@ void ERRegion::addPoint( LinkedPoint *point, int horizontalCrossingChange)
 void ERRegion::setProbability( float probability )
 {
     probability_ = probability;
-    if ( probability_ < minProb_.probability_ ) 
-    {
-        minProb_.depth_ = 0;
-        minProb_.probability_ = probability_;
-    }
-
-    if ( probability_ > maxProb_.probability_ )
-    {
-        maxProb_.depth_ = 0;
-        maxProb_.probability_ = probability_;
-    }
 }
 
 void ERRegion::updateSize(cv::Point p)
@@ -536,10 +453,6 @@ bool ERRegion::isSimilarParent( const ERRegion &reg )
     return (float) size_/parent_size > similarity_ratio;
 }
 
-void ERRegion::updateMeans( const cv::Vec4b &new_value ) 
-{
-    sums_ += new_value;
-}
 
 void ERRegion::updateEulerBit(std::uint16_t quads)
 {
@@ -584,8 +497,6 @@ void ERRegion::merge( ERRegion &child )
     // rec_.merge( child.rec_ );
     bit_rec_.merge( child.bit_rec_);
     // perim_.merge( child.perim_ );
-
-    sums_ += child.sums_;
 }
 
 void ERRegion::setMedianCrossing() 
@@ -641,12 +552,3 @@ void ERRegion::init()
     probability_ = 0;
 }
 
-ERStat ERRegion::createERStat() const
-{
-    float blue_mean = (float)sums_[0]/size_;
-    float red_mean = (float) sums_[1]/size_;
-    float green_mean = (float) sums_[2]/size_;
-    float intensity_mean = (float) sums_[3]/size_;
-
-    return ERStat( blue_mean, red_mean, green_mean, intensity_mean );
-}

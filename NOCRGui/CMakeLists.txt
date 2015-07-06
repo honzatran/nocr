@@ -26,7 +26,7 @@ qt5_wrap_ui( UIS_HDRS
     NOCRGui/newwordsdialog.ui 
     )
 
-set (bin_exec NOCRGui)
+set (bin_exec nocr-gui)
 
 add_executable(${bin_exec} ${SOURCES} ${UIS_HDRS} )
 qt5_use_modules(${bin_exec} Widgets)

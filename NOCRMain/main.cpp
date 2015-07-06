@@ -1,3 +1,12 @@
+/**
+ * @file main.cpp
+ * @brief NOCRMain program
+ * @author Tran Tuan Hiep
+ * @version 1.0
+ * @date 2015-05-21
+ */
+
+
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -35,7 +44,7 @@ int main ( int argc, char** argv )
     vector<string> input_lists;
 
 
-    std::string svm_ER2Phase = "scaled_svmEr2_handpicked.xml";
+    std::string svm_ER2Phase = "conf/scaled_svmEr2_resized.xml";
     namespace po = boost::program_options;
     po::options_description desc("Usage");
     desc.add_options()
@@ -98,16 +107,9 @@ int main ( int argc, char** argv )
 
 
     //==================== recognize text from input images =========================
-    // const std::string boost_ER1Phase = "conf/boostGeom.conf";
-    // std::string boost_ER1Phase = "boost_er1stage.conf";
-    std::string boost_ER1Phase = "boost_er1stage_handpicked.xml";
-    // const std::string svm_ER2Phase = "conf/svmERGeom.conf";
-    // std::string svm_ER2Phase = "svm_er2stage.conf";
-    const std::string svm_merge = "conf/svmMerge.conf";
-    // const std::string ocr_conf = "conf/iksvm.conf";
-    // const std::string ocr_conf = "training/train_hog_ocr.xml";
+    std::string boost_ER1Phase = "conf/boost_er1stage_handpicked.xml";
+    const std::string ocr_conf = "conf/svm_dir_ocr.conf";
 
-    const std::string ocr_conf = "training/svm_hog.xml";
     cout << svm_ER2Phase << endl;
     TextRecognition<ERTextDetection, AbstractOCR> image_reader;
     image_reader.setShowingLetters( display_letters );
@@ -115,11 +117,8 @@ int main ( int argc, char** argv )
     try 
     {
         Dictionary dictionary(dict);
-        // image_reader.loadConfiguration( boost_ER1Phase, svm_ER2Phase, svm_merge );
         image_reader.constructExtractionMethod( boost_ER1Phase, svm_ER2Phase);
-        image_reader.loadEquivConfiguration(svm_merge);
-        // unique_ptr<MyOCR> ocr( new MyOCR(ocr_conf) );
-        unique_ptr<AbstractOCR> ocr( new HogRBFOcr(ocr_conf) );
+        unique_ptr<AbstractOCR> ocr( new DirHistRBFOcr(ocr_conf) );
         image_reader.loadOcr( ocr.get() );
         
         for ( const std::string &file_path : input )

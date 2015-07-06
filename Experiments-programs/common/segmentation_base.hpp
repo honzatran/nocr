@@ -11,6 +11,7 @@
 
 #include <pugi/pugixml.hpp>
 #include <opencv2/core/core.hpp>
+#include <nocrlib/exception.h>
 
 class LetterSegmentBase
 {
@@ -23,12 +24,21 @@ class LetterSegmentBase
         std::map<std::string, std::vector<cv::Rect> > ground_truth_;
 };
 
+struct ParseError
+{
+};
+
 inline std::pair<std::string, std::string> parse(const std::string & line)
 {
-    std::stringstream ss(line);
-    std::string path, gt_file_name;
-    std::getline(ss, path, ':');
-    std::getline(ss, gt_file_name, ':');
+    std::size_t pos = line.find_last_of(':');
+
+    if (pos == std::string::npos)
+    {
+        throw NocrException<ParseError>("line has no seperator :");
+    }
+
+    std::string path = line.substr(0, pos);
+    std::string gt_file_name = line.substr(pos + 1);
 
     return std::make_pair(path, gt_file_name);
 }

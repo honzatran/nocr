@@ -133,8 +133,6 @@ struct FeatureTraits<feature::ERGeom1>
 class ERFilter2Stage
 {
     public:
-        typedef LetterStorage<ERStat> letter;
-
         /**
          * @brief constructor
          */
@@ -182,15 +180,8 @@ class ERFilter2Stage
          * @return true if r is letter candidate else false
          */
         bool isLetter( ERRegion &r );
-
-        void operator() (ERRegion & err);
-
-        std::vector<LetterStorage<ERStat> > getLetters() const;
-
-        void clearLetters();
     private:
         std::unique_ptr<AbstractFeatureExtractor> features_extractor_;
-        std::vector<LetterStorage<ERStat> > storages_;
 
         // LibSVM<feature::ERGeom1> svm_;
         ScalingLibSVM<feature::ERGeom1> svm_;
@@ -395,7 +386,7 @@ class ERTree
          * This function perform only second stage of filtering of the algorithm. Following 
          * the steps described in my bachalor thesis following the work of Neumann and Matas.
          */
-        std::vector< LetterStorage<ERStat> > getLetters(bool deallocate = true);
+        std::vector< Component > getLetters(bool deallocate = true);
         // std::vector< LetterStorage<ERStat> > getLetters( NodeType * root, bool deallocate = true );
 
         /**
@@ -461,7 +452,7 @@ class ERTree
         cv::Mat bitmap_;
         size_t processed_points_;
 
-        cv::Mat4b value_mat_;
+        // cv::Mat4b value_mat_;
         std::vector<LinkedPoint> points_;
         std::vector<bool> accumulated_pixels_;
 
@@ -515,13 +506,6 @@ class ERTree
             return cv::Point( code % cols_, code / cols_); 
         }
 
-        void setChildrensProbabilities( NodeType *parent, NodeType *child );
-
-        void breadthFirstSearchMinMax( NodeType *reg, int max_depth, 
-                ProbabilityRecord &max, ProbabilityRecord &min );
-
-        // void treeHoleArea( Region * root );
-        // void computeHoleArea( Region * node, int surrounding_area );
 
         void saveTree( NodeType *root, std::vector<NodeType*> &nodes ) const;
         
@@ -580,7 +564,8 @@ class ERTree
         bool testSimilarChildren( NodeType *r );
         bool checkChildren( NodeType *reg, int min_area, float probability );
         bool testSimilarParent( NodeType *r );
-        
+
+        static std::size_t getMinSizeDiff(std::size_t size);
 };
 
 /**
@@ -627,8 +612,7 @@ template <> class ComponentTreePolicy<ERTree>
 class ERTextDetection 
 {
     public:
-        typedef LetterStorage<ERStat> Storage; 
-        typedef std::unique_ptr<AbstractOCR> OcrPtr; 
+        typedef Component Storage; 
 
         /**
          * @brief default constructor
@@ -659,20 +643,13 @@ class ERTextDetection
          */
         std::vector< Storage > getLetters(const cv::Mat &image);
 
-        /**
-         * @brief finds component that represents letter in image
-         *
-         * @param image input image, required format CV8UC3 
-         *
-         * @return 
-         */
+        ERTree & getTree() 
+        {
+            return extremal_region_;
+        }
+
     private:
         ERTree extremal_region_;
-
-        //size limits for images
-        // const int k_small_size;
-        // const int k_medium_size;
-        // const int k_large_size;
 };
 
 
@@ -699,47 +676,13 @@ struct LetterMergingFactory : public AbstractFeatureFactory
     cv::Mat image_;
 };
 
-/// @cond
-//
-template <>
-class StatInfoConvertor<ERStat>
-{
-    public:
-        StatInfoConvertor() = default;
-
-        StatInfoConvertor(const cv::Mat &image) 
-        {
-            LetterMergingFactory factory(image);
-            features_extractor_ = factory.createFeatureExtractor();
-        }
-
-        ImageLetterInfo convert( const LetterStorage<ERStat> &letter ) const 
-        {
-            ERStat stat = letter.stat_;
-            cv::Vec4f object_mean( stat.blue_mean_, stat.green_mean_, stat.red_mean_, stat.intensity_mean_ );
-
-            std::vector<float> features =  features_extractor_->compute( letter.c_ptr_ );
-
-            cv::Vec4f border_mean( features[1], features[2], features[3], features[4] );
-            return ImageLetterInfo( object_mean, border_mean, features[0] ); 
-        }
-    private:
-        std::unique_ptr<AbstractFeatureExtractor> features_extractor_;
-};
-
 template <> 
 class SegmentationPolicy<ERTextDetection>
 {
     public:
-        typedef LetterStorage<ERStat> MethodOutput;
-        typedef StatInfoConvertor<ERStat> VisualConvertor;
+        typedef Component MethodOutput;
 
         static const bool k_perform_nm_suppresion = true;
-
-        static void initialize( VisualConvertor &visual_convertor, const cv::Mat &image )
-        {
-            visual_convertor = StatInfoConvertor<ERStat>( image );
-        }
 
         static std::vector<MethodOutput> extract
             ( ERTextDetection * er_text_detection,
@@ -748,20 +691,11 @@ class SegmentationPolicy<ERTextDetection>
             return er_text_detection->getLetters(image);
         }
 
-        static TranslationInfo translate( AbstractOCR *ocr, 
-                const LetterStorage<ERStat> &a )
+        static bool haveSignificantOverlap( const Component &a, 
+                const Component &b )
         {
-            std::vector<double> probabilities;
-            char c = ocr->translate( a.c_ptr_, probabilities );
-            // output[i] = TranslationInfo( c, probabilities ); 
-            return TranslationInfo( c, probabilities );
-        }
-
-        static bool haveSignificantOverlap( const LetterStorage<ERStat> &a, 
-                const LetterStorage<ERStat> &b )
-        {
-            cv::Rect a_rect = a.c_ptr_->rectangle();
-            cv::Rect b_rect = b.c_ptr_->rectangle();
+            cv::Rect a_rect = a.rectangle();
+            cv::Rect b_rect = b.rectangle();
             cv::Rect intersection = a_rect & b_rect;
 
             if ( intersection.area() == 0 )
@@ -774,11 +708,10 @@ class SegmentationPolicy<ERTextDetection>
             return (overlap_ratio_a > k_epsilon) && (overlap_ratio_b > k_epsilon);
         }
 
-        static Letter convert( const VisualConvertor &convertor,
-                const LetterStorage<ERStat> &a, const TranslationInfo &translation )
+        static Letter convert( const Component &a, 
+                const TranslationInfo &translation )
         {
-            ImageLetterInfo visual = convertor.convert( a );
-            return Letter( a.c_ptr_, visual, translation );
+            return Letter( std::make_shared<Component>(a), translation );
         }
 
     private:
@@ -820,7 +753,7 @@ public:
  * afterward process \p functor on \p er_tree.
  */
 template <bool SECOND_STAGE_FILTER = false, bool REJECT_SIMILAR = false, typename F> 
-void process(ERTree & er_tree, const cv::Mat & image, F & functor)
+void process(ERTree & er_tree, const cv::Mat & image, F && functor)
 {
     double min_area_ratio, max_area_ratio;
 

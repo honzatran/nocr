@@ -23,6 +23,7 @@
 #include "extremal_region.h"
 
 #define SIZE 1024
+#define SAVE_WORD 1
 
 /**
  * @brief class for text recognition and extraction in images with dictionary 
@@ -143,14 +144,8 @@ class TextRecognition
             show_words_ = show_words;
         }
 
-        void loadEquivConfiguration(const std::string & equiv_config)
-        {
-            word_equivalence_.loadConfiguration(equiv_config);
-        }
- 
     private:
         Segment<EXTRACTION, OCR> segmentation_; 
-        LetterWordEquiv word_equivalence_;
 
         bool extraction_allocated_;
 
@@ -165,19 +160,6 @@ class TextRecognition
         void showWords( const std::vector<TranslatedWord> &words, const cv::Mat &image );
 };
 
-// template <typename EXTRACTION, typename OCR>
-// void TextRecognition<EXTRACTION, OCR>::loadConfiguration( // const std::string &dictionary_file, 
-//         const std::string &er1_conf_file, 
-//         const std::string &er2_conf_file, 
-//         const std::string &merge_conf_file )
-// {
-//     er_text_detection_ = std::unique_ptr<EXTRACTION>
-//                 ( new ERTextDetection( er1_conf_file, er2_conf_file) );
-//
-//     segmentation_.loadMethod( er_text_detection_.get() );
-//
-//     word_equivalence_.loadConfiguration( merge_conf_file);
-// }
 
 
 template <typename EXTRACTION, typename OCR>
@@ -199,15 +181,10 @@ std::vector<TranslatedWord> TextRecognition<EXTRACTION, OCR>::recognize(
 
     WordGenerator generator;
 
-    generator.initHorizontalDetection( letters, word_equivalence_, image );
-    vector<TranslatedWord> words = generator.process( dictionary ); 
+    auto all_words = dictionary.getAllWords();
 
-    // auto remaining_letters = generator.getRemainingLetters();
-    //
-    // generator.initVerticalDetection(remaining_letters, word_equivalence_ );
-    // auto vertical_words = generator.process( dictionary );
-    //
-    // words.insert( words.end(), vertical_words.begin(), vertical_words.end() );
+    generator.initHorizontalDetection( letters, image );
+    vector<TranslatedWord> words = generator.process( dictionary ); 
 
     if ( show_words_ )
     {
@@ -278,6 +255,11 @@ void TextRecognition<EXTRACTION, OCR>::showWords(
         }
     }
     gui::showImage( drawer->getImage(), "detected words" );
+
+#if SAVE_WORD
+    ImageSaver img_saver;
+    img_saver.saveImage("213_words.jpg", drawer->getImage());
+#endif
 }
 
 
@@ -285,7 +267,6 @@ void TextRecognition<EXTRACTION, OCR>::showWords(
 
 template <typename T, typename OCR> 
 std::vector<TranslatedWord> recognizeWords( Segment<T, OCR> &segmentation, 
-        const LetterWordEquiv &equiv,
         const Dictionary &dictionary, 
         const cv::Mat &image )
 {
@@ -293,15 +274,9 @@ std::vector<TranslatedWord> recognizeWords( Segment<T, OCR> &segmentation,
 
     WordGenerator generator;
 
-    generator.initHorizontalDetection( letters, equiv, image );
+    generator.initHorizontalDetection( letters, image );
     vector<TranslatedWord> words = generator.process( dictionary ); 
 
-    // auto remaining_letters = generator.getRemainingLetters();
-    
-    // generator.initVerticalDetection( remaining_letters, equiv );
-    // auto vertical_words = generator.process( dictionary );
-    //
-    // words.insert( words.end(), vertical_words.begin(), vertical_words.end() );
 
     return words;
 }
@@ -322,11 +297,6 @@ struct SegmentOCRPolicy<MyOCR, LetterStorage<T> >
         translations.reserve( letter_candidates.size() );
         std::vector<double> probabilities;
 
-        // for ( const auto &object : letter_candidates )
-        // {
-        //     translations.push_back( SegmentationPolicy<ERTextDetection>::translate(ocr, object) );
-        // }
-
 
         auto characters = ocr->translate(components, probabilities);
         int nr_class = ocr->getNumberOfClasses();
@@ -342,36 +312,75 @@ struct SegmentOCRPolicy<MyOCR, LetterStorage<T> >
     }
 };
 
-template <typename T>
-struct SegmentOCRPolicy<AbstractOCR, LetterStorage<T> > 
+
+template <>
+struct SegmentOCRPolicy<AbstractOCR, std::shared_ptr<Component> > 
 {
-    static std::vector<TranslationInfo> translate(AbstractOCR * ocr, const std::vector<LetterStorage<T> > & letter_candidates)
+    static std::vector<TranslationInfo> translate(AbstractOCR * ocr, const std::vector<std::shared_ptr<Component> > & letter_candidates)
     {
         std::vector<TranslationInfo> translations;
-        std::vector<std::shared_ptr<Component> > components;
-        components.reserve(translations.size());
-        for (auto & storage : letter_candidates) 
-        {
-            components.push_back(storage.c_ptr_);
-        }
-
         translations.reserve( letter_candidates.size() );
         std::vector<double> probabilities;
 
-        for ( const auto &object : letter_candidates )
+        for ( const auto &c_ptr: letter_candidates)
         {
-            translations.push_back( SegmentationPolicy<ERTextDetection>::translate(ocr, object) );
+            std::vector<double> probabilities;
+            char c = ocr->translate( c_ptr, probabilities );
+            translations.emplace_back(c, probabilities);
         }
-
 
         return translations;
     }
 };
 
 template <>
+struct SegmentOCRPolicy<AbstractOCR, Component> 
+{
+    static std::vector<TranslationInfo> translate(AbstractOCR * ocr, std::vector<Component > & letter_candidates)
+    {
+        std::vector<TranslationInfo> translations;
+        translations.reserve( letter_candidates.size() );
+        std::vector<double> probabilities;
+
+        for ( auto & letter_component: letter_candidates)
+        {
+            std::vector<double> probabilities;
+            char c = ocr->translate( letter_component, probabilities );
+            translations.emplace_back(c, probabilities);
+        }
+
+        return translations;
+    }
+};
+
+
+template <>
 struct SegmentOCRPolicy<MyOCR, std::shared_ptr<Component> > 
 {
     static std::vector<TranslationInfo> translate(MyOCR * ocr, const std::vector<std::shared_ptr<Component> > & letter_candidates)
+    {
+        std::vector<TranslationInfo> translations;
+        translations.reserve( letter_candidates.size() );
+        std::vector<double> probabilities;
+
+        auto characters = ocr->translate(letter_candidates, probabilities);
+        int nr_class = ocr->getNumberOfClasses();
+
+        for (std::size_t i = 0; i < characters.size(); ++i) 
+        {
+            auto  it = probabilities.begin() + i * nr_class;
+            vector<double> tmp(it, it + nr_class);
+            translations.emplace_back(characters[i], tmp);
+        }
+
+        return translations;
+    }
+};
+
+template <>
+struct SegmentOCRPolicy<MyOCR, Component> 
+{
+    static std::vector<TranslationInfo> translate(MyOCR * ocr, std::vector<Component> & letter_candidates)
     {
         std::vector<TranslationInfo> translations;
         translations.reserve( letter_candidates.size() );

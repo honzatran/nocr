@@ -28,6 +28,7 @@
 #include "iksvm.h"
 #include "abstract_feature_factory.h"
 #include "abstract_ocr.h"
+#include "direction_histogram.h"
 
 
 // const static std::string alpha;
@@ -110,6 +111,10 @@ class MyOCR : public AbstractOCR
                 const std::vector<std::shared_ptr<Component> > & comp_ptrs, 
                 std::vector<double> & probabilities) override;
 
+        std::vector<char> translate(
+                std::vector<Component > & components, 
+                std::vector<double> & probabilities) override;
+
         int getNumberOfClasses() const { return iksvm_.getNumberOfClasses(); }
     private:
         IKSVM iksvm_;
@@ -147,6 +152,36 @@ class HogRBFOcr : public AbstractOCR
     private:
         std::shared_ptr< LibSVM<feature::hogOcr> > svm_;
         std::unique_ptr<AbstractFeatureExtractor> hog_;
+};
+
+/**
+ * @brief OCR using HOG combined with SVM with fast intersection kernel 
+ * for charakter recognition
+ */
+class DirHistRBFOcr : public AbstractOCR
+{
+    public:
+        /**
+         * @brief constructor, that initializes SVM
+         *
+         * @param conf_file path to config file for SVM
+         * 
+         * Constructor initializing SVM with fast intersection kernel 
+         * using @p conf_file
+         */
+        DirHistRBFOcr( const std::string &conf_file )
+        {
+            if (!svm_)
+            {
+                svm_ = create<LibSVM, feature::DirectionHist>();
+                svm_->loadConfiguration(conf_file);
+            }
+        }
+        
+        char translate( Component &c, std::vector<double> &probabilities ) override;
+    private:
+        std::shared_ptr< LibSVM<feature::DirectionHist> > svm_;
+        DirectionHistogram dir_hist_;
 };
 
 

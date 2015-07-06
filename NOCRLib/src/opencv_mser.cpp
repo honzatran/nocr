@@ -60,8 +60,14 @@ auto CvMSERDetection::getCompPtr( const cv::Mat &image )
     -> std::vector<CompPtr>
 {
     int tmp = 0.00007 * image.cols * image.rows;
-    int min_size = std::max( 60, tmp ); 
-    int max_size = 0.3 * image.rows * image.cols;
+
+    double min_area_ratio, max_area_ratio;
+    std::tie(min_area_ratio, max_area_ratio) = ErLimitSize::getErSizeLimits(image.size());
+
+    std::size_t area = image.size().area();
+
+    int min_size = std::max<int>(20, min_area_ratio * area); 
+    int max_size = max_area_ratio * area;
 
     cv::MSER extractor( 3, min_size, max_size, 0.1, 0.1 );
     std::vector<std::vector<cv::Point> > msers;
@@ -71,7 +77,7 @@ auto CvMSERDetection::getCompPtr( const cv::Mat &image )
     components.reserve( msers.size() );
     for ( const auto &vec: msers ) 
     {
-        CompPtr pointer( new Component( std::move(vec) ) ); 
+        CompPtr pointer( new Component(vec) ); 
         components.push_back( pointer ); 
     }
     return components;

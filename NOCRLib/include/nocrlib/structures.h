@@ -132,9 +132,9 @@ class Letter
          * @param info color information 
          * @param translation lexicographical information
          */
-        Letter( const CompPtr &comp_ptr , const ImageLetterInfo &info,
+        Letter( const CompPtr &comp_ptr,
                 const TranslationInfo &translation)
-                : comp_ptr_(comp_ptr), info_(info), features_loaded_(false),
+                : comp_ptr_(comp_ptr), features_loaded_(false),
                 translation_( translation )
         { 
         }
@@ -292,19 +292,8 @@ class Letter
         }
 
 
-        /**
-         * @brief returns visual information about letter
-         *
-         * @return letters visual information
-         */
-        ImageLetterInfo getImageLetterInfo() const 
-        {
-            return info_;
-        }
-
     private:
         CompPtr comp_ptr_;
-        ImageLetterInfo info_;
 
         bool features_loaded_;
         std::vector<float> features_;

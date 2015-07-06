@@ -61,7 +61,6 @@ set ( SOURCES
     ./src/word_deformation.cpp
     )
     
-add_library( NOCRLib SHARED ${HEADERS} ${SOURCES} )
-add_definitions( -DPRINT_INFO -DPRINT_TIME)
+add_library( NOCRLib SHARED ${SOURCES} )
 
 

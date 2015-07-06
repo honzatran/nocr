@@ -150,7 +150,7 @@ void LibSVMTrainBridge::save(const std::string & file_name, const svm_model * mo
     for (std::size_t i = 0;i < scalers.size(); ++i)
     {
         auto s_node = scalers_node.append_child(SCALER_TAG);
-        s_node.append_attribute(INDX_TAG).set_value(i);
+        s_node.append_attribute(INDX_TAG).set_value((int)i);
         
         s_node.append_child(MIN_TAG).text().set(scalers[i].min_);
         s_node.append_child(INTERVAL_LENGTH_TAG).text().set(scalers[i].interval_length_);

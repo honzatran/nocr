@@ -5,6 +5,7 @@
  * Compiler: g++ 4.8.3
  */
 #include "../include/nocrlib/drawer.h"
+#define THICKNESS 2
 
 RectangleDrawer::RectangleDrawer()
     : color_(cv::Scalar(0, 0, 255 ))
@@ -40,7 +41,7 @@ void RectangleDrawer::draw( const Word &w )
 
 void RectangleDrawer::drawRectangle( const cv::Rect &rect)
 {
-    cv::rectangle( canvas_, rect, color_ );
+    cv::rectangle( canvas_, rect, color_, THICKNESS );
 }
 
 void RectangleDrawer::setColor(const cv::Scalar & color) 

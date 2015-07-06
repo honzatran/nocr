@@ -1,3 +1,10 @@
+/**
+ * @file main.cpp
+ * @brief main file for word detection experiment
+ * @author Tran Tuan Hiep
+ * @version 1.0
+ * @date 2015-05-21
+ */
 
 #include <iostream>
 #include <memory>
@@ -31,9 +38,8 @@
 
 using namespace std;
 
-string er1_conf_file = "../boost_er1stage_handpicked.xml";
-// const string er2_conf_file = "conf/svmERGeom.conf";
-string er2_conf_file = "../scaled_svmEr2_handpicked.xml";
+string er1_conf_file = "../conf/boost_er1stage_handpicked.xml";
+string er2_conf_file = "../conf/scaled_svmEr2_resized.xml";
 
 string icdar_test = "";
 string svt = "";
@@ -48,11 +54,11 @@ int parseCmd(int argc, char ** argv)
     po::options_description desc("Usage");
     desc.add_options()
         ("help,h","display help message")
-        ("er1-conf-file", po::value<string>(&er2_conf_file),"path to er 1 stage Boosting conf")
+        ("er1-conf-file", po::value<string>(&er1_conf_file),"path to er 1 stage Boosting conf")
         ("er2-conf-file", po::value<string>(&er2_conf_file),"path to er 2 stage SVM conf")
         ("test,t", po::value<string>(&icdar_test),"list of ICDAR test samples")
         ("directory,d", po::value<string>(&image_dir), "path to output directory")
-        ("xml,x", po::value<string>(&xml_file), "enable xml evaluation output");
+        ("xml,x", po::value<string>(&xml_file), "directory for xml evaluation output");
     
     try 
     {
@@ -68,7 +74,7 @@ int parseCmd(int argc, char ** argv)
         return 1;
     }
 
-    if ( vm.count("help") || argc == 1 ) 
+    if ( vm.count("help") || argc == 1 || vm.count("test") == 0)
     {
         std::cout << desc << std::endl;
         return 1;
@@ -102,13 +108,11 @@ template <typename M, typename OCR>
 std::vector<TranslatedWord> runTest(
         Segment<M, OCR> & segmentation,
         Testing & testing,
-        const LetterWordEquiv & word_equiv,
         const Dictionary & dict, 
         const cv::Mat & image,
         const std::string & file_name)
 {
-    auto words = recognizeWords(segmentation, word_equiv, 
-            dict, image);
+    auto words = recognizeWords(segmentation, dict, image);
 
     auto results = testing.updateScores( file_name, words );
     
@@ -141,43 +145,40 @@ std::vector<TranslatedWord> runTest(
         
 int main( int argc, char **argv )
 {
-    parseCmd(argc, argv);
+    if (parseCmd(argc, argv))
+    {
+        return 1;
+    }
     
-    // const string ocr_conf = "../conf/iksvm.conf";
     const string dict = "../conf/dict";
-    const string merge_conf = "../conf/svmMerge.conf";
 
 #if IKSVM_OCR
-    const std::string ocr_conf = "../conf/iksvm.conf";
+    const std::string ocr_conf = "../training/svm_hog_fast.xml";
     unique_ptr<MyOCR> ocr( new MyOCR(ocr_conf) );
     Segment<ERTextDetection, MyOCR> er_text_segment;
+    Segment<CvMSERDetection, MyOCR> segmentation; 
 
 #else
-    const std::string ocr_conf = "../training/svm_hog.xml";
-    unique_ptr<AbstractOCR> ocr( new HogRBFOcr(ocr_conf) );
+
+    const std::string ocr_conf = "../conf/svm_dir_ocr.conf";
+    unique_ptr<AbstractOCR> ocr( new DirHistRBFOcr(ocr_conf) );
     Segment<ERTextDetection, AbstractOCR> er_text_segment;
+    Segment<CvMSERDetection, AbstractOCR> segmentation; 
 #endif
 
-    // const string er1_conf_file = "conf/boostGeom.conf";
-
-    // Segment<CvMSERDetection> segmentation; 
+    CvMSERDetection detection_method;
+    detection_method.loadConfiguration(er2_conf_file);
     //
-    // CvMSERDetection detection_method;
-    // detection_method.loadConfiguration(filter_conf);
-    //
-    // segmentation.loadMethod( &detection_method );
+    segmentation.loadMethod( &detection_method );
 
-    //
-    // segmentation.loadOcr( ocr.get() );
+    segmentation.loadOcr( ocr.get() );
 
-    LetterWordEquiv word_equivalence( merge_conf );
 
     Dictionary dictionary(dict);
-
-    // Testing mser_testing;
-
     auto decider = std::make_shared<TruePositiveTest>();
-    // mser_testing.setTruePositiveDecider(decider.get());
+
+    Testing mser_testing;
+    mser_testing.setTruePositiveDecider(decider.get());
 
     ERTextDetection er_text_detection( er1_conf_file, er2_conf_file );
     er_text_segment.loadMethod(&er_text_detection);
@@ -194,7 +195,7 @@ int main( int argc, char **argv )
         XmlGroundTruth xml;
         xml.loadData("icdar2013.xml");
 
-        // mser_testing.loadGroundTruth(&xml);
+        mser_testing.loadGroundTruth(&xml);
         er_testing.loadGroundTruth(&xml);
 
         loader ld;
@@ -209,33 +210,43 @@ int main( int argc, char **argv )
             {
                 image = resizer.resizeKeepAspectRatio(image);
                 er_testing.notifyResize(file_name, resizer.getLastScale());
+                mser_testing.notifyResize(file_name, resizer.getLastScale());
             }
 
 
-            runTest( er_text_segment, er_testing, word_equivalence, dictionary, image, file_name );
-            // runTest( segmentation, mser_testing, word_equivalence, dictionary, image, file_name );
+            runTest( er_text_segment, er_testing, dictionary, image, file_name );
+            runTest( segmentation, mser_testing, dictionary, image, file_name );
         }
 
     }
 
-    // cout << "MSER results:" << endl;
-    // mser_testing.makeRecord( cout );
     cout << "ER results:" << endl;
     er_testing.makeRecord( cout );
+    cout << "MSER results:" << endl;
+    mser_testing.makeRecord( cout );
     if (xml_file.empty())
     {
         er_testing.printXmlOutput(cout);
+        mser_testing.printXmlOutput(cout);
     }
     else
     {
-        std::ofstream ofs(xml_file);
-        er_testing.printXmlOutput(ofs);
-        ofs.close();
+        std::ofstream ofs_er(xml_file + "/icdar2013_er.xml");
+        std::ofstream ofs_mser(xml_file + "/icdar2013_mser.xml");
+        if (ofs_er.is_open() && ofs_mser.is_open())
+        {
+            er_testing.printXmlOutput(ofs_er);
+            mser_testing.printXmlOutput(ofs_mser);
 
-        EvaluationDrawer eval_drawer;
-        eval_drawer.loadXml(xml_file);
+            ofs_mser.close();
+            ofs_er.close();
+        }
+        else
+        {
+            cerr << "invalid xml directory" << endl;
+            return 1;
+        }
     }
 
-    
     return 0;
 }

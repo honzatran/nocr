@@ -100,16 +100,8 @@ class SegmentationPolicy<CvMSERDetection>
 {
     public:
         typedef std::shared_ptr<Component> MethodOutput;
-        typedef MserVisualComputer VisualConvertor;
 
         static const bool k_perform_nm_suppresion = true;
-
-
-        static void initialize( VisualConvertor &visual_convertor, 
-                const cv::Mat &image )
-        {
-            visual_convertor.setImage( image );
-        }
 
 
         static std::vector<MethodOutput> extract
@@ -152,12 +144,10 @@ class SegmentationPolicy<CvMSERDetection>
 
         
         static Letter convert( 
-                const VisualConvertor &visual_convertor,
                 const MethodOutput &c_ptr, 
                 const TranslationInfo &translation )
         {
-            ImageLetterInfo visual = visual_convertor.convert( c_ptr );
-            return Letter( c_ptr, visual, translation );
+            return Letter( c_ptr, translation );
         }
 
 

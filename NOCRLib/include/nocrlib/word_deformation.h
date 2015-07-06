@@ -5,6 +5,13 @@
 #include "classifier_wrap.h"
 #include <algorithm>
 
+struct LetterEquivInfo
+{
+    cv::Vec3f color_medians;
+    float swt_median, height;
+};
+
+
 class WordDeformation
 {
 public:
@@ -44,6 +51,35 @@ public:
 
         return cv::Vec3f(b_val[half], g_val[half], r_val[half]);
     }
+
+    template <typename OBJECT>
+    LetterEquivInfo computeEquivDescriptor(const OBJECT & obj)
+    {
+        cv::Vec3f color_medians = getColorMedians(obj);
+
+        SwtTransform swt;
+        cv::Mat swt_transformation = swt(obj.getBinaryMat(), false);
+
+        auto points = obj.getPoints();
+        vector<float> values;
+        values.reserve(points.size());
+
+        for (auto it = swt_transformation.begin<float>(); it != swt_transformation.end<float>(); ++it)
+        {
+            if (*it > 0)
+            {
+                values.push_back(*it);
+            }
+        }
+
+        auto swt_median_it = values.begin() + values.size() / 2;
+
+        std::nth_element(values.begin(), swt_median_it, values.end());
+        float height = obj.getHeight();
+
+        return { color_medians, *swt_median_it, height };
+    }
+
 
 private:
     cv::Mat image_;

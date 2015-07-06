@@ -22,31 +22,33 @@ class SwtLetterSegmentation
 
         SwtLetterSegmentation();
 
-        std::vector< LetterStorage<float> > segmentFromImage( const cv::Mat &image );
+        std::vector< CompPtr> segmentFromImage( const cv::Mat &image );
 
-        void setMinArea( size_t min_area )
+        void setMinArea( std::size_t min_area )
         {
             min_area_ = min_area;
         }
 
-        void setMaxArea( size_t max_area )
+        void setMaxArea( std::size_t max_area )
         {
             max_area_ = max_area;
         }
 
+        void loadConfiguration(const std::string & classifer_configuration);
+
     private:
-        size_t min_area_, max_area_;
+        std::size_t min_area_, max_area_;
 
         const int rect_size = 32;
         SwtTransform swt_;
         std::unique_ptr< AbstractFeatureExtractor> geom_feature_;
         
 
-        std::unique_ptr< LibSVM<feature::SwtGeom1> > svm_;
+        std::shared_ptr< LibSVM<feature::SwtGeom1> > svm_;
 
         cv::Mat localBinarization( const cv::Mat &image );
 
-        std::vector< LetterStorage<float> > 
+        std::vector< CompPtr > 
             getLetterStorages( const cv::Mat &binary );
 
 };
@@ -69,41 +71,23 @@ template <>
 class SegmentationPolicy<SwtLetterSegmentation>
 {
     public:
-        typedef LetterStorage<float> MethodOutput;
-        typedef SwtStorageConvertor VisualConvertor;
+        typedef std::shared_ptr<Component> MethodOutput;
 
         static const bool k_perform_nm_suppresion = false;
 
-
-        static void initialize( VisualConvertor &visual_convertor, 
-                const cv::Mat &image )
-        {
-            visual_convertor.setImage( image );
-        }
-
-
         static std::vector<MethodOutput> extract
-            ( const std::unique_ptr<SwtLetterSegmentation> &swt_segmentation,
+            ( SwtLetterSegmentation * swt_segmentation,
               const cv::Mat &image )
         {
             return swt_segmentation->segmentFromImage(image);
-        }
-
-        static TranslationInfo translate( 
-                AbstractOCR *ocr,
-                const MethodOutput &l_storage )
-        {
-            std::vector<double> probabilities;
-            char c = ocr->translate( l_storage.c_ptr_, probabilities );
-            return TranslationInfo( c, probabilities );
         }
 
         static bool haveSignificantOverlap( 
                 const MethodOutput &a, 
                 const MethodOutput &b )
         {
-            cv::Rect a_rect = a.c_ptr_->rectangle();
-            cv::Rect b_rect = b.c_ptr_->rectangle();
+            cv::Rect a_rect = a->rectangle();
+            cv::Rect b_rect = b->rectangle();
             cv::Rect intersection = a_rect & b_rect;
 
             if ( intersection.area() == 0 )
@@ -122,12 +106,10 @@ class SegmentationPolicy<SwtLetterSegmentation>
 
         
         static Letter convert( 
-                const VisualConvertor &visual_convertor,
                 const MethodOutput &l_storage,
                 const TranslationInfo &translation )
         {
-            ImageLetterInfo visual = visual_convertor.convert( l_storage );
-            return Letter( l_storage.c_ptr_, visual, translation );
+            return Letter( l_storage, translation );
         }
 
 

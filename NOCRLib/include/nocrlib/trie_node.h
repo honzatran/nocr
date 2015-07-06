@@ -79,12 +79,15 @@ class TrieNode
          * and value is pointer to the TrieNode*
          */
         std::unordered_map< char, TrieNode* > getChildren() 
+        //
+        // std::vector< std::pair<char, TrieNode> > getChildren()
         {
             return childs_;
         }
 
     private:
         std::unordered_map< char, TrieNode* > childs_;
+        // std::vector< std::pair<char, TrieNode> > childs_;
         bool word_node_;
 
         friend class LevensteinDistanceTrie;

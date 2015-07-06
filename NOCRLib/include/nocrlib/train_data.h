@@ -23,11 +23,13 @@
 #include <algorithm>
 #include <limits>
 
+#define TRAIN_DATA_DEBUG 0
+
 /**
  * @brief enum for component extraction in image 
  * to perform training on features extracted from components
  */
-enum class extraction { BlackAndWhite, BWMaxComponent };
+enum class extraction { BlackAndWhite, BWMaxComponent, OneComponent };
 
 
 /**
@@ -57,7 +59,26 @@ class TrainExtractionPolicy<extraction::BlackAndWhite>
             ComponentFinder<ComponentMergeRule, connectivity::eightpass> cf( image );
             return cf.findAllComponents();
         }
+};
 
+template <>
+class TrainExtractionPolicy<extraction::OneComponent>
+{
+    public:
+        static std::vector<Component> extract(const cv::Mat & image)
+        {
+            std::vector<cv::Point> points;
+
+            for (auto it = image.begin<uchar>(); it != image.end<uchar>(); ++it)
+            {
+                if (*it > 200)
+                {
+                    points.push_back(it.pos());
+                }
+            }
+
+            return { Component(points) };
+        }
 };
 
 template<>
@@ -69,6 +90,19 @@ class TrainExtractionPolicy<extraction::BWMaxComponent>
         {
             ComponentFinder<ComponentMergeRule, connectivity::eightpass> cf( image );
             std::vector<Component> comp = cf.findAllComponents();
+#if TRAIN_DATA_DEBUG
+            if (comp.size() > 1)
+            {
+                for (auto & c : comp)
+                {
+                    gui::showImage(c.getBinaryMat(), "comp");
+                }
+
+                auto whole_comp = TrainExtractionPolicy<extraction::OneComponent>::extract(image);
+
+                gui::showImage(whole_comp.front().getBinaryMat(), "whole component");
+            }
+#endif
 
             auto comp_it = std::max_element(comp.begin(), comp.end(), [] (const Component & a, const Component & b) 
                     {
@@ -152,6 +186,9 @@ struct TrainDataCreator
             label = std::stoi(buffer.substr(pos + 1));
 
             cv::Mat image = cv::imread( file_path, CV_LOAD_IMAGE_GRAYSCALE );
+#if TRAIN_DATA_DEBUG
+            std::cout << file_path << std::endl;
+#endif
             if ( image.empty() )
             {
                 // std::cout << info.getPathToFile() << std::endl;

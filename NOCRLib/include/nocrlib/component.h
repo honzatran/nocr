@@ -282,6 +282,26 @@ class Component
             return binary_mat_;
         }
 
+
+        /**
+         * @brief return binary image of component
+         *
+         * @return binary image of component
+         *
+         * Component pixels have value 255 and background has value 0.
+         */
+        const cv::Mat getBinaryMat() const
+        {
+            if ( binary_mat_.empty() ) 
+            {
+                cv::Mat binary;
+                cv::copyMakeBorder( createBinaryMat(255,0), binary, 1, 1, 1, 1, cv::BORDER_CONSTANT, 0);
+
+                return binary;
+            }
+            return binary_mat_;
+        }
+
         /**
          * @brief return minimal rotated bounding box of component
          *
@@ -302,6 +322,11 @@ class Component
             oss << c.left_ << ':' << c.upper_ << ':' << c.getWidth() 
                 << ':' << c.getHeight();
             return oss;
+        }
+
+        cv::Point getLeftUpperCorner() const
+        {
+            return cv::Point(left_, upper_);
         }
 
     private:

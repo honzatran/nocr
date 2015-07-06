@@ -1,5 +1,6 @@
 
 #include "../include/nocrlib/word_deformation.h"
+#include "../include/nocrlib/swt.h"
 
 std::vector<float> 
 WordDeformation::getDescriptor(const Word & word)

@@ -31,6 +31,8 @@
 #include <random>
 #include <functional>
 
+#include "exception.h"
+
 /// @cond
 //
 
@@ -304,7 +306,10 @@ class ImageSaver
 
         void saveImage( const std::string &name, const cv::Mat &image )
         {
-            cv::imwrite( name, image, compression_ );
+            if (!cv::imwrite( name, image, compression_ ))
+            {
+                throw NocrException<ImageSaver>("cannot save image to file " + name);
+            }
         }
 
     private:
@@ -362,7 +367,7 @@ inline bool fileExists( const std::string &file_path )
 
 inline std::string getFileName(const std::string &path)
 {
-    unsigned pos = path.find_last_of("/\\");
+    std::size_t pos = path.find_last_of("/\\");
     if ( pos == string::npos )
     {
         return std::string();
@@ -425,6 +430,35 @@ inline double angle(cv::Point a, cv::Point b, cv::Point c)
     cv::Point v2 = c - b;
 
     return std::acos(v1.ddot(v2)/(cv::norm(v1) * cv::norm(v2)));
+}
+
+template <typename ITER1, typename ITER2, typename COMPARATOR = std::less<typename ITER1::value_type> >
+bool nonEmptyIntersection(ITER1 && begin1, ITER1 && end1, 
+        ITER2 && begin2, ITER2 && end2, COMPARATOR && comp = COMPARATOR())
+{
+    static_assert(std::is_same<typename ITER1::value_type, typename ITER2::value_type>::value, 
+            "ITER1::value_type is different from ITER2::value_type");
+    auto it1 = begin1;
+    auto it2 = begin2;
+    while (it1 != end1 && it2 != end2)
+    {
+        decltype(*it1) & x = *it1;
+        decltype(*it2) & y = *it2;
+        if (comp(x, y))
+        {
+            ++it1;
+        }
+        else if (comp(y, x))
+        {
+            ++it2;
+        }
+        else
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /// @endcond

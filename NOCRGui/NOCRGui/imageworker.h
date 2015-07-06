@@ -25,8 +25,8 @@ public:
     explicit ImageWorker(QObject *parent = 0);
 
     void loadConfiguration( const std::string &dict,
-        const std::string & er_first_stage, const std::string &er_second_stage,
-                            const std::string & merge_confs );
+        const std::string & er_first_stage, const std::string &er_second_stage);
+
 
     void loadOcr(std::unique_ptr<AbstractOCR> ocr);
     cv::Mat getImage();
